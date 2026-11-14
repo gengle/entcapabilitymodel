@@ -1,10 +1,10 @@
 ---
 id: mem_4497e75ecab0
 created: "2026-11-14T20:22:29.999Z"
-last_retrieved: "2026-11-14T20:40:59.805Z"
-retrieval_count: 1
+last_retrieved: "2026-11-14T21:47:57.819Z"
+retrieval_count: 2
 strength: 1
-half_life_days: 732
+half_life_days: 734
 layer: episodic
 tags: [error, auto-captured]
 emotional_valence: negative

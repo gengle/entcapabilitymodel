@@ -1,10 +1,10 @@
 ---
 id: mem_becf9cf6b364
 created: "2026-11-14T21:32:29.901Z"
-last_retrieved: "2026-11-14T21:32:29.901Z"
-retrieval_count: 0
+last_retrieved: "2026-11-14T21:47:57.819Z"
+retrieval_count: 1
 strength: 1
-half_life_days: 730
+half_life_days: 732
 layer: episodic
 tags: [error, auto-captured]
 emotional_valence: negative
