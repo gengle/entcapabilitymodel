@@ -242,3 +242,74 @@ table { border-collapse: collapse; width: 100%; }
   .editor { height: 60vh; }
   .top { overflow-x: auto; }
 }
+
+/* ---- edit forms */
+textarea {
+  font: inherit; color: inherit; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; width: 100%; resize: vertical;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mode-btn { font-size: 12px; padding: 2px 10px; }
+.mode-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.form { display: grid; gap: 10px; }
+.form h4 { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.form-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 8px; background: var(--panel-2);
+}
+.form-grid th { text-align: left; font-weight: 500; color: var(--muted); width: 34%; padding: 4px 8px 4px 0; vertical-align: middle; }
+.form-grid td { padding: 4px 0; }
+.form-grid th.bad { color: var(--bad); }
+.req { color: var(--bad); margin-left: 2px; }
+.ctl { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.ctl input:not([type="radio"]):not([type="range"]), .ctl select { min-width: 0; width: 220px; max-width: 100%; }
+.ctl textarea { width: 260px; max-width: 100%; }
+.name-input { width: 100%; max-width: 320px; font-weight: 600; }
+.clear { border: none; background: none; color: var(--muted); padding: 0 6px; font-size: 16px; line-height: 1; }
+.clear:hover { color: var(--bad); }
+.radios { flex-wrap: wrap; gap: 4px; }
+.radios label {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--line);
+  border-radius: 99px; font-size: 13px; cursor: pointer;
+}
+.radios label.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.radios label.none { color: var(--muted); border-style: dashed; }
+.radios input { margin: 0; accent-color: var(--accent); }
+.slider input[type="range"] { width: 160px; accent-color: var(--accent); }
+.slider output { font-family: var(--mono); font-size: 12px; min-width: 64px; }
+.rel-edit { display: grid; gap: 4px; }
+.rel-verb { font-size: 12px; color: var(--muted); }
+.rel-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  padding: 6px 8px; margin-left: 10px; border: 1px solid var(--line); border-radius: 8px;
+}
+.rel-row.bad { border-color: var(--bad); }
+.rel-row .err-text { flex-basis: 100%; }
+.rel-attr { display: inline-flex; align-items: center; gap: 6px; }
+select.target { max-width: 280px; }
+.remove { margin-left: auto; font-size: 12px; }
+.remove:hover { color: var(--bad); }
+.rel-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.rel-add input { flex: 1; min-width: 160px; max-width: 320px; }
+.kids li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.forms-h { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.grid.forms td { vertical-align: middle; }
+.settings { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.settings label { display: inline-flex; align-items: center; gap: 4px; }
+.settings input { width: 180px; }
+.settings input.num { width: 70px; }
+.preview-cell { min-width: 200px; }
+.render .card { overflow-x: auto; }
+
+/* ---- model version + universal ids */
+.pill.ver { background: var(--panel-2); color: var(--text); font-family: var(--mono); font-weight: 500; }
+.pill.ver.none { color: var(--warn); background: var(--warn-soft); }
+.uid {
+  font-family: var(--mono); font-size: 11px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--muted); vertical-align: 1px;
+}
+.uid.missing { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+.version-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.version-row .row { display: flex; gap: 6px; }
+.version-row input { width: 150px; }
+.version-now { font-family: var(--mono); font-size: 18px; font-weight: 700; margin-right: 6px; }

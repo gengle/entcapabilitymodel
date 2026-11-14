@@ -1,10 +1,12 @@
 """semyaml.py - load the semantic model from a tree of YAML files (and write one from any loaded model).
 
 Every file is a mapping. A file with `kind` is a model document; a file without one is a fragment.
-  kind: Model       include                                     the entry point (model.yaml)
+  kind: Model       name, version (MAJOR.MINOR.PATCH), include   the entry point (model.yaml)
   kind: Schema      root, levels, props, rules, entity_types, relations
-  kind: Capability  name, parent (path, optional), props, children: [{name, props, children}]
-  kind: Entity      type, name, props, relations: {verb: [target | {target: X, attr: value}]}
+  kind: Capability  name, id, parent (path, optional), props, children: [{name, id, props, children}]
+  kind: Entity      type, name, id, props, relations: {verb: [target | {target: X, attr: value}]}
+`id` is a capability's or entity's universal id (a UUID). It survives renames and moves, a relation target may use it
+instead of a name, and `python sem.py ids` (or assign_ids below) writes one for every object that lacks it.
 `include` (a path or list of paths, globs allowed, relative to the including file, inside the model folder)
 loads each matching file. Documents are added to the model; fragments are merged into the including file
 first (mappings merge, lists append, the including file wins on scalars). Each capability, entity, prop and
@@ -14,11 +16,11 @@ Problems are collected in `m.load_errors` as "file: message" and reported by sem
 import copy, glob, os, re
 import yaml
 
-KEYS = {"Model": {"include", "name", "description"},
+KEYS = {"Model": {"include", "name", "description", "version"},
         "Schema": {"include", "root", "levels", "props", "rules", "entity_types", "relations"},
-        "Capability": {"include", "name", "parent", "props", "children"},
-        "Entity": {"include", "type", "name", "props", "relations"}}
-CHILD_KEYS = {"name", "props", "children"}
+        "Capability": {"include", "name", "id", "parent", "props", "children"},
+        "Entity": {"include", "type", "name", "id", "props", "relations"}}
+CHILD_KEYS = {"name", "id", "props", "children"}
 RTYPE_KEYS = {"from", "to", "attrs", "inverse", "min_level", "satisfied_by", "conflicts_with", "transitive", "no_cycles"}
 
 
@@ -161,7 +163,10 @@ def load(path, S, overrides=None):
         extra = set(d) - KEYS[kind] - {"kind"}
         if extra:
             L.errors.append(f"{f}: unknown key(s) for {kind}: {', '.join(sorted(extra))}")
-        if kind == "Schema":
+        if kind == "Model" and f == m.entry:
+            m.name = None if d.get("name") is None else sval(d["name"])
+            m.version = None if d.get("version") is None else sval(d["version"])
+        elif kind == "Schema":
             schema(m, S, f, d, L.errors)
         elif kind == "Capability":
             caps.append((f, d, prov))
@@ -250,6 +255,7 @@ def capability(m, S, parent, f, d, prov, path, errors):
         return
     n = S.Node(str(d["name"]), parent)
     n.src, n.prop_src = prov.get(path + ("name",), f), {}
+    n.uid = None if d.get("id") is None else sval(d["id"])
     parent.children.append(n)
     for k, v in (d.get("props") or {}).items():
         if v is not None:
@@ -269,6 +275,7 @@ def entity(m, S, f, d, prov, errors):
         return
     e = S.Entity(str(d["type"]), str(d["name"]))
     e.src, e.prop_src = f, {}
+    e.uid = None if d.get("id") is None else sval(d["id"])
     for k, v in (d.get("props") or {}).items():
         if v is not None:
             e.local[k], e.prop_src[k] = sval(v), prov.get(("props", k), f)
@@ -312,7 +319,9 @@ def write(path, data):
 
 def dump(m, S, outdir):
     """Write m as a YAML source tree: model.yaml, schema.yaml, capabilities/<L1>.yaml, entities/<name>.yaml."""
-    out = [write(os.path.join(outdir, "model.yaml"), {"kind": "Model", "include": ["schema.yaml", "capabilities/*.yaml", "entities/*.yaml"]})]
+    head = {"kind": "Model", **({"name": m.name} if getattr(m, "name", None) else {}),
+            **({"version": m.version} if getattr(m, "version", None) else {})}
+    out = [write(os.path.join(outdir, "model.yaml"), {**head, "include": ["schema.yaml", "capabilities/*.yaml", "entities/*.yaml"]})]
     sch = {"kind": "Schema", "root": m.root_name, "levels": dict(sorted(m.levels.items())),
            "props": {p.name: spec(p) for p in m.props.values()},
            "rules": {k: v or True for k, v in m.rules.items()},
@@ -328,7 +337,7 @@ def dump(m, S, outdir):
     out.append(write(os.path.join(outdir, "schema.yaml"), sch))
 
     def cap(n):
-        d = {"name": n.name}
+        d = {"name": n.name, **({"id": n.uid} if getattr(n, "uid", None) else {})}
         if n.local:
             d["props"] = {k: typed(m.props.get(k), v) for k, v in n.local.items()}
         if n.children:
@@ -338,7 +347,7 @@ def dump(m, S, outdir):
         out.append(write(os.path.join(outdir, "capabilities", slug(top.name) + ".yaml"), {"kind": "Capability", **cap(top)}))
     for e in m.entities:
         defs = m.eprop_defs(e.type) if e.type in m.etypes else {}
-        d = {"kind": "Entity", "type": e.type, "name": e.name}
+        d = {"kind": "Entity", "type": e.type, "name": e.name, **({"id": e.uid} if getattr(e, "uid", None) else {})}
         if e.local:
             d["props"] = {k: typed(defs.get(k), v) for k, v in e.local.items()}
         rels = {}
@@ -349,3 +358,109 @@ def dump(m, S, outdir):
             d["relations"] = rels
         out.append(write(os.path.join(outdir, "entities", slug(e.name) + ".yaml"), d))
     return out
+
+
+# ------------------------------------------------------------------ in-place edits (keep comments and layout)
+def _lines(path):
+    with open(path, encoding="utf-8", newline="") as fh:
+        text = fh.read()
+    return text, text.splitlines(keepends=True)
+
+
+def _save(path, lines):
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write("".join(lines))
+
+
+def _eol(line):
+    return "\r\n" if line.endswith("\r\n") else "\n"
+
+
+def _after(lines, key_node, val_node, text):
+    """Index to insert a new sibling line after `key: value` (the value may run over several lines)."""
+    end = val_node.end_mark
+    last = end.line if end.column > 0 else end.line - 1
+    return max(last, key_node.start_mark.line) + 1, " " * key_node.start_mark.column, _eol(lines[key_node.start_mark.line])
+
+
+def _get(mapping, key):
+    for k, v in mapping.value:
+        if isinstance(k, yaml.ScalarNode) and k.value == key:
+            return k, v
+    return None, None
+
+
+def assign_ids(root, dry_run=False, new_id=None):
+    """Write `id: <uuid>` next to the name of every capability and entity (in kind: Capability / Entity files) that has
+    none. Edits the text in place, so comments and layout stay. Returns [(file, label, id)]."""
+    import uuid
+    new_id = new_id or (lambda: str(uuid.uuid4()))
+    root, done = os.path.abspath(root), []
+    for d, dirs, files in os.walk(root):
+        dirs[:] = sorted(x for x in dirs if not x.startswith("."))
+        for fn in sorted(f for f in files if f.endswith((".yaml", ".yml"))):
+            path = os.path.join(d, fn)
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            text, lines = _lines(path)
+            try:
+                doc = yaml.compose(text)
+            except yaml.YAMLError:
+                continue
+            if not isinstance(doc, yaml.MappingNode):
+                continue
+            kind = _get(doc, "kind")[1]
+            kind = kind.value if isinstance(kind, yaml.ScalarNode) else None
+            inserts = []
+
+            def visit(node, label):
+                k, v = _get(node, "name")
+                if k is None or not isinstance(v, yaml.ScalarNode) or _get(node, "id")[0] is not None:
+                    return
+                if node.flow_style:
+                    return  # `{name: X}` on one line: left alone; give it an id by hand
+                at, indent, eol = _after(lines, k, v, text)
+                uid = new_id()
+                inserts.append((at, f"{indent}id: {uid}{eol}"))
+                done.append((rel, label + v.value, uid))
+
+            if kind == "Entity":
+                visit(doc, "entity ")
+            elif kind == "Capability":
+                def walk(node):
+                    visit(node, "")
+                    kids = _get(node, "children")[1]
+                    for c in (kids.value if isinstance(kids, yaml.SequenceNode) else []):
+                        if isinstance(c, yaml.MappingNode):
+                            walk(c)
+                walk(doc)
+            if inserts and not dry_run:
+                if lines and not lines[-1].endswith(("\n", "\r")):
+                    lines[-1] += _eol(lines[0])
+                for at, line in sorted(inserts, reverse=True):
+                    lines.insert(at, line)
+                _save(path, lines)
+    return done
+
+
+def read_version(root):
+    data = yaml.safe_load(open(os.path.join(root, "model.yaml"), encoding="utf-8")) or {}
+    return None if data.get("version") is None else sval(data["version"])
+
+
+def write_version(root, version):
+    """Set `version:` in model.yaml, editing that one line (or adding it after `name:` / `kind:`)."""
+    path = os.path.join(root, "model.yaml")
+    text, lines = _lines(path)
+    doc = yaml.compose(text)
+    k, v = _get(doc, "version")
+    if k is not None:
+        i = k.start_mark.line
+        lines[i] = lines[i][:k.start_mark.column] + f"version: {version}" + lines[i][v.end_mark.column:] if v.end_mark.line == i \
+            else f"version: {version}{_eol(lines[i])}"
+    else:
+        k, v = _get(doc, "name")
+        if k is None:
+            k, v = _get(doc, "kind")
+        at, _, eol = _after(lines, k, v, text)
+        lines.insert(at, f"version: {version}{eol}")
+    _save(path, lines)

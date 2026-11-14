@@ -1,6 +1,7 @@
 kind: Entity
 type: Application
 name: Talent Platform
+id: be062647-b638-4730-bfb0-c2af1b69cbad
 include: ../fragments/sso-client.yaml
 props:
   vendor: Acme HR Cloud

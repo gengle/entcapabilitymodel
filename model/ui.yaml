@@ -1,0 +1,8 @@
+# Form controls used by the viewer's edit forms. The Forms page writes this file; you can also edit it here.
+# It is not part of the model (nothing includes it), so it never changes validation.
+#   capability: <prop>   entity: <prop>   relation: <verb>.<attr>
+#   control: text | textarea | combo | number | slider | select | radio
+#   Defaults: enum -> select, int -> number, string -> text.
+#   select / radio / combo on a non-enum field take options: [...]; slider takes min, max and step.
+capability:
+  review_cycle_days: {control: select, options: [30, 60, 90, 180, 365]}

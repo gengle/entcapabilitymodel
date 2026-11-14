@@ -28,4 +28,6 @@ export const api = {
   save: (path: string, content: string, force = false) => call<Snapshot>("/api/file", json("PUT", { path, content, force })),
   remove: (path: string, force = false) => call<Snapshot>(`/api/file?path=${q(path)}&force=${force ? 1 : 0}`, { method: "DELETE" }),
   impact: (entity: string) => call<Impact>(`/api/impact?entity=${q(entity)}`),
+  assignIds: () => call<Snapshot & { added: number }>("/api/ids", { method: "POST" }),
+  setVersion: (to: string) => call<Snapshot>("/api/version", json("POST", { to })),
 };

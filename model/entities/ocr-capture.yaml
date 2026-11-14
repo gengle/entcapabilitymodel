@@ -1,6 +1,7 @@
 kind: Entity
 type: Application
 name: OCR Capture
+id: 13917cb1-88a4-4fab-8e1f-fcb1925437f3
 include: ../fragments/sso-client.yaml
 props:
   vendor: ScanCo

@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { EditorPane, type Draft, type Rejection } from "./Editor";
-import { buildIndex, href, ModelCtx, parseHash, slug, type Route } from "./model";
+import { buildIndex, href, ModelCtx, parseHash, slug, uuid, type Route } from "./model";
 import { Sidebar } from "./Sidebar";
 import type { Snapshot } from "./types";
+import { FormsView } from "./forms";
+import { parseUi, UI_FILE } from "./ui";
 import { CapabilityView, EntityView, FileView, Overview, SchemaView } from "./views";
+import { applyEdit, type Edit } from "./yamledit";
 
 const POLL_MS = 1500;
 const PREVIEW_MS = 250;
+
+function storedFormMode() {
+  try {
+    return localStorage.getItem("sem.form") === "1";
+  } catch {
+    return false;
+  }
+}
 
 export default function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null); // saved state on disk
@@ -18,6 +29,16 @@ export default function App() {
   const [reject, setReject] = useState<Rejection | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
+  const [uiText, setUiText] = useState<string | null>(null);
+  const [formMode, setFormModeState] = useState(storedFormMode);
+  const setFormMode = (on: boolean) => {
+    setFormModeState(on);
+    try {
+      localStorage.setItem("sem.form", on ? "1" : "0");
+    } catch {
+      /* per-viewer convenience only */
+    }
+  };
   const draftsRef = useRef(drafts);
   draftsRef.current = drafts;
   const verRef = useRef<string | undefined>(undefined);
@@ -39,6 +60,10 @@ export default function App() {
     const s = await api.model();
     verRef.current = s.version;
     setSnap(s);
+    api.file(UI_FILE).then(
+      (f) => setUiText(f.content),
+      (e) => setUiText(e instanceof ApiError && e.status === 404 ? "" : null),
+    );
     const paths = Object.keys(draftsRef.current);
     const disk = await Promise.all(paths.map((p) => api.file(p).then((f) => f.content, () => null)));
     setDrafts((prev) => {
@@ -88,11 +113,12 @@ export default function App() {
   const view = preview ?? snap;
   const idx = useMemo(() => (view ? buildIndex(view) : null), [view]);
   const savedIdx = useMemo(() => (snap ? buildIndex(snap) : null), [snap]);
+  const ui = useMemo(() => parseUi(uiText), [uiText]);
 
   // ---- which file the editor shows follows the route
   useEffect(() => {
     if (!idx) return;
-    if (route.k === "overview" || route.k === "schema") return setActive(null);
+    if (route.k === "overview" || route.k === "schema" || route.k === "forms") return setActive(null);
     const p =
       route.k === "file"
         ? route.path
@@ -163,7 +189,7 @@ export default function App() {
   const create = async (type: string, name: string) => {
     const path = `entities/${slug(name) || "entity"}.yaml`;
     if (idx?.files.has(path)) return setNotice(`${path} already exists`);
-    const content = `kind: Entity\ntype: ${type}\nname: ${JSON.stringify(name)}\nprops: {}\nrelations: {}\n`;
+    const content = `kind: Entity\ntype: ${type}\nname: ${JSON.stringify(name)}\nid: ${uuid()}\nprops: {}\nrelations: {}\n`;
     try {
       applySaved(await api.save(path, content));
       location.hash = href("ent:" + name);
@@ -174,17 +200,63 @@ export default function App() {
 
   const edit = (path: string, patch: (d: Draft) => Draft) => setDrafts((p) => (p[path] ? { ...p, [path]: patch(p[path]) } : p));
 
+  // Form edits rewrite the draft text through the yaml Document API, so they preview and save like typed edits.
+  const mutate = (path: string, fn: Edit) => {
+    const d = draftsRef.current[path];
+    if (!d) {
+      setNotice(`${path} is still loading`);
+      return false;
+    }
+    try {
+      const text = applyEdit(d.text, fn);
+      if (text !== d.text) {
+        draftsRef.current = { ...draftsRef.current, [path]: { ...d, text } };
+        setDrafts(draftsRef.current);
+        if (reject?.path === path) setReject(null);
+      }
+      return true;
+    } catch (e) {
+      setNotice((e as Error).message);
+      return false;
+    }
+  };
+
+  // server actions that write files themselves (assign ids, set version): reload so open editors pick up the new text
+  const run = async (what: Promise<Snapshot>, done: string) => {
+    try {
+      await what;
+      await reload();
+      setReject(null);
+      setNotice(done);
+      return true;
+    } catch (e) {
+      setNotice((e as Error).message);
+      return false;
+    }
+  };
+
+  const saveUi = async (text: string) => {
+    try {
+      applySaved(await api.save(UI_FILE, text, true));
+      setUiText(text);
+      setNotice(`Saved ${UI_FILE}`);
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
+  };
+
   if (!view || !idx)
     return <div className="boot">{online ? "Loading model…" : "Cannot reach server.py on /api. Start it with: python server.py"}</div>;
 
   const dirty = new Set(dirtyFiles.map(([p]) => p));
   const errors = view.issues.filter((i) => i.level === "error").length;
   const warnings = view.issues.length - errors;
-  const showEditor = route.k !== "overview" && route.k !== "schema" && !!active;
+  const showEditor = route.k !== "overview" && route.k !== "schema" && route.k !== "forms" && !!active;
 
   let main: React.ReactNode;
   if (route.k === "overview") main = <Overview />;
   else if (route.k === "schema") main = <SchemaView />;
+  else if (route.k === "forms") main = <FormsView />;
   else if (route.k === "file") {
     const f = idx.files.get(route.path);
     main = f ? <FileView file={f} /> : <p className="muted pad">No YAML file {route.path}.</p>;
@@ -205,11 +277,20 @@ export default function App() {
   }
 
   return (
-    <ModelCtx.Provider value={{ snap: view, idx, dirty }}>
+    <ModelCtx.Provider
+      value={{ snap: view, idx, dirty, ui, uiText, saveUi, formMode, setFormMode, mutate, save: () => saveRef.current(), run }}
+    >
       <div className={`app${showEditor ? "" : " no-editor"}`}>
         <header className="top">
           <a className="brand" href="#/">
-            Semantic model
+            {view.model.name ?? "Semantic model"}
+          </a>
+          <a
+            className={`pill ver${view.model.version ? "" : " none"}`}
+            href={`#/file/${encodeURIComponent(view.entry)}`}
+            title="Model version (set or bump it on the model.yaml page)"
+          >
+            {view.model.version ? `v${view.model.version}` : "no version"}
           </a>
           <nav className="topnav">
             <a href="#/" className={route.k === "overview" ? "on" : ""}>
@@ -217,6 +298,9 @@ export default function App() {
             </a>
             <a href="#/schema" className={route.k === "schema" ? "on" : ""}>
               Schema
+            </a>
+            <a href="#/forms" className={route.k === "forms" ? "on" : ""} title="Choose the control that edits each field">
+              Forms
             </a>
           </nav>
           <span className="grow" />

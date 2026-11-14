@@ -1,6 +1,7 @@
 kind: Entity
 type: Service
 name: PAM Vault
+id: 9ad15bd8-ee30-4bd3-b7de-4d695793f773
 props:
   owner: Identity Team
 relations:

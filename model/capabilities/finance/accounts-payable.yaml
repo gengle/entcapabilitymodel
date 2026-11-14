@@ -1,27 +1,35 @@
 kind: Capability
 parent: Finance
 name: Accounts Payable
+id: d720a76b-d38b-48c9-a98a-dc48c9ddade0
 props:
   owner: Dana Reyes
 children:
   - name: Invoice Management
+    id: c1de3205-3aa1-4170-9903-5f8999b4c276
     children:
       - name: Invoice Capture
+        id: d94e1bb4-8342-4000-94ad-bc5dd14b6e89
         props:
           maturity: defined
       - name: Three-Way Matching
+        id: 0a1c103f-8735-48f1-918e-1a0a470448b4
         props:
           maturity: pilot
       - name: Invoice Approval
+        id: 9a278940-d178-4940-826d-ec46f9d25ce8
         props:
           maturity: defined
   - name: Supplier Payments
+    id: 73f58141-72ca-46a4-b393-5495064cfc6e
     props:
       maturity: optimized
     children:
       - name: Payment Run
+        id: 3a1bf64c-c549-4a5f-bf74-ff8ab9645542
         props:
           maturity: optimized
       - name: Payment Reconciliation
+        id: 7c4657d2-f550-40a4-9b01-f59a53b3e25d
         props:
           maturity: defined

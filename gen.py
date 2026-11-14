@@ -133,11 +133,11 @@ def gen_sql(S, m, out, level):
         for k in m.eprop_defs(t):
             if k not in ent_props:
                 ent_props.append(k)
-    L = ["-- generated; SQLite", "PRAGMA foreign_keys=ON;"]
-    L.append("CREATE TABLE capability(id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, name TEXT NOT NULL, parent_id INTEGER REFERENCES capability(id), level INTEGER NOT NULL"
+    L = ["-- generated; SQLite" + (f" from model version {m.version}" if m.version else ""), "PRAGMA foreign_keys=ON;"]
+    L.append("CREATE TABLE capability(id INTEGER PRIMARY KEY, uid TEXT UNIQUE, path TEXT UNIQUE NOT NULL, name TEXT NOT NULL, parent_id INTEGER REFERENCES capability(id), level INTEGER NOT NULL"
              + "".join(f", {c} {'INTEGER' if m.props[c].type == 'int' else 'TEXT'}" for c in cap_cols) + ");")
     L.append("CREATE TABLE entity_type(name TEXT PRIMARY KEY, parent TEXT REFERENCES entity_type(name));")
-    L.append("CREATE TABLE entity(id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, type TEXT NOT NULL REFERENCES entity_type(name), props TEXT NOT NULL DEFAULT '{}');")
+    L.append("CREATE TABLE entity(id INTEGER PRIMARY KEY, uid TEXT UNIQUE, name TEXT UNIQUE NOT NULL, type TEXT NOT NULL REFERENCES entity_type(name), props TEXT NOT NULL DEFAULT '{}');")
     L.append("CREATE TABLE relation_type(name TEXT PRIMARY KEY, inverse TEXT, from_types TEXT, to_types TEXT, transitive INTEGER, min_level INTEGER);")
     L.append("CREATE TABLE link(id INTEGER PRIMARY KEY, src INTEGER NOT NULL REFERENCES entity(id), relation TEXT NOT NULL REFERENCES relation_type(name),"
              " cap_id INTEGER REFERENCES capability(id), ent_id INTEGER REFERENCES entity(id), attrs TEXT NOT NULL DEFAULT '{}',"
@@ -146,13 +146,13 @@ def gen_sql(S, m, out, level):
     ids = {n: i + 1 for i, n in enumerate(m.all_nodes())}
     for n in m.all_nodes():
         vals = [S.pyval(n, m, c) if False else m.resolve(n, m.props[c])[0] for c in cap_cols]
-        L.append(f"INSERT INTO capability VALUES({ids[n]},{sqlq(n.path())},{sqlq(n.name)},{ids[n.parent] if n.parent in ids else 'NULL'},{n.level()}"
+        L.append(f"INSERT INTO capability VALUES({ids[n]},{sqlq(n.uid)},{sqlq(n.path())},{sqlq(n.name)},{ids[n.parent] if n.parent in ids else 'NULL'},{n.level()}"
                  + "".join("," + sqlq(v) for v in vals) + ");")
     for t in m.etypes.values():
         L.append(f"INSERT INTO entity_type VALUES({sqlq(t.name)},{sqlq(t.parent)});")
     eids = {e.name: i + 1 for i, e in enumerate(m.entities)}
     for e in m.entities:
-        L.append(f"INSERT INTO entity VALUES({eids[e.name]},{sqlq(e.name)},{sqlq(e.type)},{sqlq(json.dumps(S.eprops(m, e)))});")
+        L.append(f"INSERT INTO entity VALUES({eids[e.name]},{sqlq(e.uid)},{sqlq(e.name)},{sqlq(e.type)},{sqlq(json.dumps(S.eprops(m, e)))});")
     for r in m.rtypes.values():
         L.append(f"INSERT INTO relation_type VALUES({sqlq(r.name)},{sqlq(r.inverse)},{sqlq('|'.join(r.frm))},{sqlq('|'.join(r.to))},{int(r.transitive)},{r.min_level or 'NULL'});")
     for e in m.entities:
@@ -283,7 +283,7 @@ def gen_openapi(S, m, out, level):
         paths[p + "/{name}"] = {"get": {"summary": f"Get {t}", "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}], "responses": ok(t)}}
     for rt in m.rtypes.values():
         paths[f"/entities/{{name}}/{rt.name}"] = {"get": {"summary": f"{rt.name} links ({'|'.join(rt.frm)} -> {'|'.join(rt.to)})", "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}], "responses": ok(f"Link_{rt.name}", True)}}
-    w(out, "openapi.json", json.dumps({"openapi": "3.0.3", "info": {"title": f"{m.root_name} model API", "version": "1.0.0"}, "paths": paths, "components": {"schemas": comp}}, indent=2))
+    w(out, "openapi.json", json.dumps({"openapi": "3.0.3", "info": {"title": f"{m.name or m.root_name + ' model'} API", "version": m.version or "0.0.0"}, "paths": paths, "components": {"schemas": comp}}, indent=2))
 
 
 # ---------------------------------------------------------------- mermaid / csv
@@ -316,9 +316,9 @@ def gen_csv(S, m, out, level):
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, "capabilities.csv"), "w", newline="", encoding="utf-8") as f:
         c = csv.writer(f)
-        c.writerow(["path", "name", "level"] + list(m.props))
+        c.writerow(["id", "path", "name", "level"] + list(m.props))
         for n in m.all_nodes():
-            c.writerow([n.path(), n.name, n.level()] + [m.resolve(n, p)[0] for p in m.props.values()])
+            c.writerow([n.uid or "", n.path(), n.name, n.level()] + [m.resolve(n, p)[0] for p in m.props.values()])
     keys = []
     for e in m.entities:
         for k in S.eprops(m, e):
@@ -326,10 +326,10 @@ def gen_csv(S, m, out, level):
                 keys.append(k)
     with open(os.path.join(out, "entities.csv"), "w", newline="", encoding="utf-8") as f:
         c = csv.writer(f)
-        c.writerow(["name", "type"] + keys)
+        c.writerow(["id", "name", "type"] + keys)
         for e in m.entities:
             pr = S.eprops(m, e)
-            c.writerow([e.name, e.type] + [pr.get(k, "") for k in keys])
+            c.writerow([e.uid or "", e.name, e.type] + [pr.get(k, "") for k in keys])
     ak = sorted({k for rt in m.rtypes.values() for k in rt.attrs})
     with open(os.path.join(out, "relations.csv"), "w", newline="", encoding="utf-8") as f:
         c = csv.writer(f)

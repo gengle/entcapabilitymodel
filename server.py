@@ -9,6 +9,11 @@ GET  /api/impact?entity=Name          what retiring/removing an entity would bre
 POST /api/preview {files: {path: content}}  snapshot as if those files had that content (nothing is written)
 PUT  /api/file {path, content, force} write a file; rejected (422) if it adds validation errors, unless force
 DELETE /api/file?path=...             delete a file; same rule
+POST /api/ids                         give every capability/entity without an `id` a UUID (writes those files)
+POST /api/version {to}                set model.yaml's version: major | minor | patch (bump) or an explicit x.y.z
+
+ui.yaml in the model folder holds the viewer's form-control settings (written by its Forms page). Nothing includes it,
+so it is not part of the model; it is read and written through /api/file and left out of the snapshot's file list.
 """
 import argparse, collections, hashlib, json, mimetypes, os, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(HERE, "web", "dist")
 LOCK = threading.Lock()
 ROOT = None  # absolute model folder, set in main()
+UI_FILE = "ui.yaml"  # viewer form settings, not part of the model
 
 
 def yaml_files():
@@ -92,7 +98,7 @@ def snapshot(m):
         direct = [sem.eid(e) for e in ents if any(r["verb"] in verbs and r["target"] is n for r in e.rels)]
         rolled = [sem.eid(e) for e in sem.providers(m, n)]
         status = None if n.level() < min_lv else "white" if not rolled else "overlap" if len(direct) >= 2 else "ok"
-        return {"id": sem.cid(n), "name": n.name, "path": n.path(), "level": n.level(), "levelName": m.levels.get(n.level(), ""),
+        return {"id": sem.cid(n), "uid": n.uid, "name": n.name, "path": n.path(), "level": n.level(), "levelName": m.levels.get(n.level(), ""),
                 "src": n.src, "props": props, "extra": [k for k in n.local if k not in m.props],
                 "providers": direct, "rolledProviders": rolled, "status": status,
                 "incoming": incoming[sem.cid(n)], "children": [cap(c) for c in n.children]}
@@ -105,7 +111,7 @@ def snapshot(m):
         props += [{"name": k, "value": v, "origin": "unknown", "src": e.prop_src.get(k)} for k, v in e.local.items() if k not in defs]
         rels = [{"verb": r["verb"], "text": r["text"], "target": sem.nid(r["target"]) if r["target"] is not None else None,
                  "label": sem.target_text(r), "attrs": r["attrs"], "src": r.get("src"), "err": r["err"]} for r in e.rels]
-        return {"id": sem.eid(e), "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
+        return {"id": sem.eid(e), "uid": e.uid, "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
                 "retired": sem.retired(e), "props": props, "relations": rels, "incoming": incoming[sem.eid(e)]}
 
     entities = [ent(e) for e in ents]
@@ -120,6 +126,8 @@ def snapshot(m):
     files = {}
     for p in yaml_files():
         r = rel(p)
+        if r == UI_FILE and r not in m.files:
+            continue
         info = m.files.get(r)
         if info is None:
             try:
@@ -148,6 +156,7 @@ def snapshot(m):
     covered = [n for n in nodes if n.level() >= min_lv]
     return {
         "entry": m.entry,
+        "model": {"name": m.name, "version": m.version},
         "schema": {"root": m.root_name, "levels": {str(k): v for k, v in sorted(m.levels.items())},
                    "props": [prop_json(p) for p in m.props.values()], "rules": m.rules,
                    "entityTypes": etypes, "relationTypes": rtypes},
@@ -246,7 +255,18 @@ class Handler(BaseHTTPRequestHandler):
             self.static(url)
 
     def post(self):
-        if urlparse(self.path).path != "/api/preview":
+        url = urlparse(self.path).path
+        if url == "/api/ids":
+            with LOCK:
+                added = semyaml.assign_ids(ROOT)
+                return self.send(200, {**snapshot(load()), "version": version(), "added": len(added)})
+        if url == "/api/version":
+            to = str(self.body().get("to", "")).strip()
+            with LOCK:
+                new = sem.bump(semyaml.read_version(ROOT), to)  # ValueError -> 400
+                semyaml.write_version(ROOT, new)
+                return self.send(200, {**snapshot(load()), "version": version()})
+        if url != "/api/preview":
             return self.send(404, {"error": "no such endpoint"})
         b = self.body()
         files = dict(b.get("files") or {})

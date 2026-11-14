@@ -1,6 +1,7 @@
 kind: Entity
 type: Application
 name: SAP S/4
+id: 317ba6a5-7d15-4b86-83af-9b037413e3c9
 include: ../fragments/finance-it.yaml
 props:
   vendor: SAP

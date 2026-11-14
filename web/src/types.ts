@@ -29,6 +29,7 @@ export type Status = "ok" | "white" | "overlap" | null;
 
 export interface Cap {
   id: string;
+  uid: string | null; // universal id (YAML `id`, a UUID); survives renames
   name: string;
   path: string;
   level: number;
@@ -55,6 +56,7 @@ export interface Rel {
 
 export interface Ent {
   id: string;
+  uid: string | null;
   name: string;
   type: string;
   chain: string[];
@@ -111,7 +113,8 @@ export interface RelationType {
 
 export interface Snapshot {
   entry: string;
-  version?: string;
+  version?: string; // hash of the files on disk (live reload), not the model version
+  model: { name: string | null; version: string | null };
   schema: {
     root: string;
     levels: Record<string, string>;

@@ -1,5 +1,6 @@
 kind: Capability
 name: Finance
+id: a76250ee-75eb-4a37-86c0-b271568fd7a5
 # Accounts Payable lives in its own file and attaches itself with `parent: Finance`.
 include: finance/accounts-payable.yaml
 props:
@@ -8,10 +9,18 @@ props:
   review_cycle_days: 90
 children:
   - name: Financial Planning
+    id: 99a8bc43-a1e7-46c7-9414-3a6e852716f3
     props:
       criticality: medium
+      review_cycle_days: 60
+      maturity: optimized
+      lifecycle: active
     children:
       - name: Budgeting
+        id: cf2a5900-deb7-4934-a024-5bb1c5b0e35a
         props:
           maturity: defined
       - name: Forecasting
+        id: db698280-94d0-40ee-8be2-78dcb098b9ef
+      - name: Test Yogo
+        id: 33964414-4557-44b1-bac4-3c9601fe20fc

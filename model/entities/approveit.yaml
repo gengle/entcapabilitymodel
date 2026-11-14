@@ -1,6 +1,7 @@
 kind: Entity
 type: Application
 name: ApproveIt
+id: 15a48551-c293-4c1b-9237-6289eb6a0f72
 include:
   - ../fragments/finance-it.yaml
   - ../fragments/sso-client.yaml

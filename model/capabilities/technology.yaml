@@ -1,14 +1,19 @@
 kind: Capability
 name: Technology
+id: 2f3d3fc6-f8e7-4a3d-a0f5-4e07189ae1cf
 props:
   owner: CIO Office
   criticality: high
 children:
   - name: Security
+    id: b11ba409-d5fb-4e95-9eeb-25d37d633ad5
     children:
       - name: Access Management
+        id: 0520ffdb-c5bd-4f6e-8129-d1ac022dd0d7
         children:
           - name: Single Sign-On
+            id: d54cfb4b-b947-47bd-9b0e-afd63b888f19
             props:
               maturity: optimized
           - name: Privileged Access
+            id: ce18fd25-f366-46a7-89f4-3a39afcb335e

@@ -1,14 +1,20 @@
 kind: Capability
 name: Human Resources
+id: c917784e-34bb-4df5-8731-c93730e87a69
 props:
   owner: CHRO Office
 children:
   - name: Talent Acquisition
+    id: a5d0e46f-2c31-4159-9228-bfc11e09f59b
     children:
       - name: Recruiting
+        id: ee6b8460-b267-40eb-853a-0634eec9d3d5
         children:
           - name: Candidate Sourcing
+            id: 1e627176-bb29-4dd7-93e3-b72ac474599f
             props:
               maturity: defined
           - name: Interview Scheduling
+            id: 91b8099e-8daa-4d72-ba46-ff99c5f05095
       - name: Onboarding
+        id: 1cb49b32-0362-4210-8374-3d25cec210f3

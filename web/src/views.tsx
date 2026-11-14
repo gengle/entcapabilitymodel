@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "./api";
+import { CapabilityForm, EntityForm } from "./forms";
 import { fileHref, groupBy, href, label, useModel } from "./model";
 import type { Cap, Ent, FileInfo, Impact, Incoming, Issue, PropVal, Status } from "./types";
 
@@ -82,6 +83,36 @@ function Section({ title, children, count }: { title: string; children: React.Re
   );
 }
 
+/** The universal id, shortened; click copies the full UUID. */
+function Uid({ uid }: { uid: string | null }) {
+  const [copied, setCopied] = useState(false);
+  if (!uid) return <span className="uid missing" title="No id yet: use Assign ids on the Overview, or run python sem.py ids">no id</span>;
+  const copy = () => {
+    try {
+      navigator.clipboard?.writeText(uid).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      });
+    } catch {
+      /* clipboard needs a secure context; the full id is still in the tooltip */
+    }
+  };
+  return (
+    <button className="uid" title={`${uid} (click to copy)`} onClick={copy}>
+      {copied ? "copied" : `id ${uid.slice(0, 8)}…`}
+    </button>
+  );
+}
+
+function FormToggle() {
+  const { formMode, setFormMode } = useModel();
+  return (
+    <button className={`mode-btn${formMode ? " on" : ""}`} aria-pressed={formMode} onClick={() => setFormMode(!formMode)}>
+      {formMode ? "Done editing" : "Edit form"}
+    </button>
+  );
+}
+
 function IncomingList({ items }: { items: Incoming[] }) {
   const { idx } = useModel();
   if (!items.length) return <p className="muted">Nothing points here.</p>;
@@ -103,7 +134,7 @@ function IncomingList({ items }: { items: Incoming[] }) {
 
 // ---------------------------------------------------------------- entity
 export function EntityView({ ent }: { ent: Ent }) {
-  const { idx, snap } = useModel();
+  const { idx, snap, formMode } = useModel();
   const file = idx.files.get(ent.src);
   const rtypes = new Map(snap.schema.relationTypes.map((r) => [r.name, r]));
   return (
@@ -112,8 +143,10 @@ export function EntityView({ ent }: { ent: Ent }) {
         <span className="kind kind-Entity">{ent.type}</span>
         <h2>{ent.name}</h2>
         {ent.retired && <span className="status status-white">retired</span>}
+        <span className="grow" />
+        <FormToggle />
         <div className="sub">
-          is-a {ent.chain.join(" › ") || "?"} · defined in <FileLink path={ent.src} />
+          is-a {ent.chain.join(" › ") || "?"} · defined in <FileLink path={ent.src} /> <Uid uid={ent.uid} />
         </div>
       </header>
       <Issues issues={(idx.issuesByFile.get(ent.src) ?? []).filter((i) => i.msg.includes(ent.name))} />
@@ -125,6 +158,12 @@ export function EntityView({ ent }: { ent: Ent }) {
           ))}
         </div>
       )}
+      {formMode ? (
+        <Section title="Edit">
+          <EntityForm ent={ent} />
+        </Section>
+      ) : (
+        <>
       <Section title="Properties">
         <PropsTable props={ent.props} home={ent.src} />
       </Section>
@@ -151,6 +190,8 @@ export function EntityView({ ent }: { ent: Ent }) {
           <p className="muted">No relations.</p>
         )}
       </Section>
+        </>
+      )}
       <Section title="Pointing here">
         <IncomingList items={ent.incoming} />
       </Section>
@@ -243,7 +284,7 @@ function Origin({ p, home }: { p: PropVal; home: string | null }) {
 
 // ---------------------------------------------------------------- capability
 export function CapabilityView({ cap }: { cap: Cap }) {
-  const { idx } = useModel();
+  const { idx, formMode } = useModel();
   const parts = cap.path.split("/");
   const direct = new Set(cap.providers);
   const below = cap.rolledProviders.filter((p) => !direct.has(p));
@@ -255,6 +296,8 @@ export function CapabilityView({ cap }: { cap: Cap }) {
         </span>
         <h2>{cap.name}</h2>
         <StatusBadge status={cap.status} />
+        <span className="grow" />
+        {cap.src && <FormToggle />}
         <div className="sub crumbs">
           {parts.slice(0, -1).map((_, i) => (
             <span key={i}>
@@ -267,14 +310,21 @@ export function CapabilityView({ cap }: { cap: Cap }) {
               {" "}
               · defined in <FileLink path={cap.src} />
             </>
-          )}
+          )}{" "}
+          <Uid uid={cap.uid} />
         </div>
       </header>
       <Issues issues={(idx.issuesByFile.get(cap.src ?? "") ?? []).filter((i) => i.msg.startsWith(cap.path + ":") || i.msg.includes(" " + cap.path + " "))} />
-      <Section title="Properties">
-        <PropsTable props={cap.props} home={cap.src} />
-        {!!cap.extra.length && <p className="err-text">Unknown properties: {cap.extra.join(", ")}</p>}
-      </Section>
+      {formMode && cap.src ? (
+        <Section title="Edit">
+          <CapabilityForm cap={cap} />
+        </Section>
+      ) : (
+        <Section title="Properties">
+          <PropsTable props={cap.props} home={cap.src} />
+          {!!cap.extra.length && <p className="err-text">Unknown properties: {cap.extra.join(", ")}</p>}
+        </Section>
+      )}
       <Section title="Provided by" count={cap.rolledProviders.length}>
         {cap.rolledProviders.length ? (
           <>
@@ -297,7 +347,7 @@ export function CapabilityView({ cap }: { cap: Cap }) {
       <Section title="Pointing here">
         <IncomingList items={cap.incoming} />
       </Section>
-      {!!cap.children.length && (
+      {!!cap.children.length && !(formMode && cap.src) && (
         <Section title="Children" count={cap.children.length}>
           <CapTree caps={cap.children} />
         </Section>
@@ -404,10 +454,52 @@ function FragmentUse({ file }: { file: FileInfo }) {
   );
 }
 
+function VersionControl() {
+  const { snap, run, dirty } = useModel();
+  const v = snap.model.version;
+  const [text, setText] = useState("");
+  const set = (to: string) => run(api.setVersion(to), `Model version set`).then((ok) => ok && setText(""));
+  return (
+    <Section title="Model version">
+      <div className="version-row">
+        <span className="version-now">{v ? `v${v}` : <span className="muted">not set</span>}</span>
+        {v && /^\d+\.\d+\.\d+/.test(v) && (
+          <>
+            <button onClick={() => set("patch")} title="Fixes and small edits">
+              Bump patch
+            </button>
+            <button onClick={() => set("minor")} title="New capabilities, entities or relations">
+              Bump minor
+            </button>
+            <button onClick={() => set("major")} title="Breaking changes (renames, removals, schema changes)">
+              Bump major
+            </button>
+          </>
+        )}
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (text.trim()) set(text.trim());
+          }}
+        >
+          <input aria-label="Set version" placeholder={v ? "or set e.g. 2.0.0" : "e.g. 1.0.0"} value={text} onChange={(e) => setText(e.target.value)} />
+          <button type="submit" disabled={!text.trim()}>
+            Set
+          </button>
+        </form>
+      </div>
+      {dirty.has(snap.entry) && <p className="muted small">model.yaml has unsaved edits in the editor; a version change writes the file directly.</p>}
+    </Section>
+  );
+}
+
 function ModelSummary() {
   const { snap } = useModel();
   const kinds = groupBy(snap.files.filter((f) => f.reached), (f) => f.kind);
   return (
+    <>
+    <VersionControl />
     <Section title="Reached files">
       <ul className="plain">
         {kinds.map(([k, fs]) => (
@@ -417,6 +509,7 @@ function ModelSummary() {
         ))}
       </ul>
     </Section>
+    </>
   );
 }
 
@@ -534,8 +627,19 @@ export function SchemaView() {
 }
 
 // ---------------------------------------------------------------- overview
+function countMissingIds(snap: import("./types").Snapshot) {
+  let n = snap.entities.filter((e) => !e.uid).length;
+  const walk = (c: Cap) => {
+    if (!c.uid) n++;
+    c.children.forEach(walk);
+  };
+  snap.capabilities.forEach(walk);
+  return n;
+}
+
 export function Overview() {
-  const { snap } = useModel();
+  const { snap, run } = useModel();
+  const missing = countMissingIds(snap);
   const errs = snap.issues.filter((i) => i.level === "error").length;
   const warns = snap.issues.length - errs;
   const c = snap.coverage;
@@ -548,6 +652,13 @@ export function Overview() {
         <Stat n={errs} label="errors" tone={errs ? "bad" : "good"} />
         <Stat n={warns} label="warnings" tone={warns ? "warn" : "good"} />
       </div>
+      {!!missing && (
+        <p className="banner warn">
+          {missing} capabilit{missing === 1 ? "y" : "ies"}/entit{missing === 1 ? "y" : "ies"} without a universal id.{" "}
+          <button onClick={() => run(api.assignIds(), `Assigned ${missing} id${missing === 1 ? "" : "s"}`)}>Assign ids</button>{" "}
+          <span className="muted small">writes an `id:` line under each name; unsaved edits in the editor stay as drafts</span>
+        </p>
+      )}
       {!!snap.issues.length && (
         <article className="card">
           <Section title="Validation" count={snap.issues.length}>

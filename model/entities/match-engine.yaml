@@ -1,6 +1,7 @@
 kind: Entity
 type: Application
 name: Match Engine
+id: f0e4a2ea-91fc-409f-9a31-daf25ae76493
 include: ../fragments/finance-it.yaml
 relations:
   exposes:

@@ -1,8 +1,10 @@
 kind: Entity
 type: Service
 name: Corporate SSO
+id: 2d83999f-aed2-41c1-8150-8578c55c84b7
 props:
   owner: Identity Team
 relations:
   exposes:
     - Single Sign-On
+    - Candidate Sourcing

@@ -9,7 +9,9 @@ META       type add <Name> [Parent] | type prop <Type> "key: type [= default]"
            relation add <name> <from|from> <to|to> [inverse=x] [transitive] [no_cycles]
 NAVIGATE   neighbors <ref> | closure <ref> <relation> | path <A> <B> | who <ref> | gaps | coverage | impact <Entity>
 GENERATE   gen <site|sql|typeql|jsonschema|openapi|mermaid|csv|all> <outdir> [--level N] | yaml <outdir>
-<ref> is an entity name, or a capability path / unique capability name.
+YAML       ids [--dry-run]   give every capability and entity without an `id` a new UUID (written into its file)
+           version [major|minor|patch|<x.y.z>]   show the model version, bump it, or set it (model.yaml)
+<ref> is an entity name, a capability path / unique capability name, or an `id`.
 Model: $SEM_MODEL, else ./model/ (YAML, see semyaml.py) if present, else ./model.sem. A YAML model is read-only
 here: EDIT and META commands refuse it, edit its files (or use server.py). `yaml <outdir>` converts any model.
 """
@@ -18,6 +20,8 @@ import collections, json, os, re, sys
 MODEL = os.environ.get("SEM_MODEL") or ("model" if os.path.isdir("model") else "model.sem")
 PROP_RE = re.compile(r'^(\w+):\s*(\w+)(?:\(([^)]*)\))?(?:\s*=\s*("[^"]*"|\S+))?((?:\s+(?:inherit|required))*)\s*$')
 REL_RE = re.compile(r'^(\w+)\s+(.+?)(?:\s*\[([^\]]*)\])?\s*$')
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 def unq(v):
@@ -62,6 +66,7 @@ def parse_prop(rest, ln=0):
 class Node:
     def __init__(self, name, parent=None):
         self.name, self.parent, self.children, self.local = name, parent, [], {}
+        self.uid = None  # universal id (YAML `id`); stays the same when the capability is renamed or moved
 
     def path(self):
         parts, n = [], self
@@ -82,6 +87,7 @@ class Node:
 class Entity:
     def __init__(self, etype, name):
         self.type, self.name, self.local, self.rels = etype, name, {}, []
+        self.uid = None  # universal id (YAML `id`)
 
 
 class EType:
@@ -100,6 +106,7 @@ class Model:
     def __init__(self):
         self.root_name, self.levels, self.props, self.rules = "Capability", {}, {}, {}
         self.etypes, self.rtypes, self.entities, self.top = {}, {}, [], Node("")
+        self.name = self.version = None  # from model.yaml (YAML models only)
 
     # ---- capability tree
     def all_nodes(self):
@@ -119,7 +126,7 @@ class Model:
         return n if n is not self.top else None
 
     def find_cap(self, text):
-        n = self.find(text)
+        n = self.find(text) or next((x for x in self.all_nodes() if x.uid and x.uid.lower() == text.lower()), None)
         if n:
             return n, None
         if "/" not in text:
@@ -151,7 +158,8 @@ class Model:
 
     # ---- entities and types
     def entity(self, name):
-        return next((e for e in self.entities if e.name.lower() == name.lower()), None)
+        return next((e for e in self.entities if e.name.lower() == name.lower()), None) or \
+            next((e for e in self.entities if e.uid and e.uid.lower() == name.lower()), None)
 
     def chain(self, t):
         out = []
@@ -533,11 +541,76 @@ def validate(m):
             for u in list(adj):
                 if u not in state:
                     dfs(u, [])
+    if getattr(m, "yaml", False):
+        validate_ids(m, errs, warns)
     for e, r, rt in unmet(m):
         sev = r["attrs"].get("dependency", "hard")
         msg = f"{e.name} {rt.name} {r['target'].path()} ({sev}) but no active entity {'/'.join(rt.satisfied_by)} it"
         (errs if m.rules.get("unmet_requirements") == "error" and sev == "hard" else warns).append(msg)
     return errs, warns
+
+
+def validate_ids(m, errs, warns):
+    """Model version and universal ids: every capability and entity should carry a unique UUID `id`."""
+    if m.version is None:
+        warns.append(f"{m.entry}: no model version (add `version: 1.0.0`, or run: python sem.py version 1.0.0)")
+    elif not SEMVER_RE.match(m.version):
+        errs.append(f"{m.entry}: version '{m.version}' is not MAJOR.MINOR.PATCH")
+    owners, missing = {}, collections.Counter()
+    for x, label in [(n, n.path()) for n in m.all_nodes()] + [(e, f"entity {e.name}") for e in m.entities]:
+        if not x.uid:
+            missing[getattr(x, "src", None) or "?"] += 1
+        elif not UUID_RE.match(x.uid):
+            errs.append(f"{label}: id '{x.uid}' is not a UUID")
+        elif x.uid.lower() in owners:
+            errs.append(f"{label}: id {x.uid} is already used by {owners[x.uid.lower()]}")
+        else:
+            owners[x.uid.lower()] = label
+    for f, k in missing.items():
+        warns.append(f"{f}: {k} capabilit{'y' if k == 1 else 'ies'}/entit{'y' if k == 1 else 'ies'} without an id "
+                     "(run: python sem.py ids)")
+
+
+def yaml_root():
+    root = MODEL if os.path.isdir(MODEL) else os.path.dirname(os.path.abspath(MODEL))
+    if not os.path.isfile(os.path.join(root, "model.yaml")):
+        sys.exit("this command needs a YAML model (a folder with model.yaml)")
+    return root
+
+
+def bump(old, how):
+    """The version after `how` (major | minor | patch | an explicit x.y.z); ValueError if that is not possible."""
+    if how in ("major", "minor", "patch"):
+        if not old or not SEMVER_RE.match(old):
+            raise ValueError(f"cannot bump '{old}'; set a version first (e.g. 1.0.0)")
+        x, y, z = (int(v) for v in re.match(r"(\d+)\.(\d+)\.(\d+)", old).groups())
+        return {"major": f"{x + 1}.0.0", "minor": f"{x}.{y + 1}.0", "patch": f"{x}.{y}.{z + 1}"}[how]
+    if not SEMVER_RE.match(how):
+        raise ValueError(f"'{how}' is not MAJOR.MINOR.PATCH (or major / minor / patch)")
+    return how
+
+
+def cmd_version(rest):
+    import semyaml
+    root = yaml_root()
+    old = semyaml.read_version(root)
+    if not rest:
+        return print(old or "no version set")
+    try:
+        new = bump(old, rest[0])
+    except ValueError as x:
+        sys.exit(str(x))
+    semyaml.write_version(root, new)
+    print(f"version {old or '(none)'} -> {new}")
+
+
+def cmd_ids(rest):
+    import semyaml
+    dry = "--dry-run" in rest
+    done = semyaml.assign_ids(yaml_root(), dry_run=dry)
+    for f, label, uid in done:
+        print(f"{'would add' if dry else 'added'} id {uid}  {label}  ({f})")
+    print(f"{len(done)} id(s) {'to add' if dry else 'added'}" if done else "every capability and entity already has an id")
 
 
 # ------------------------------------------------------------------ commands
@@ -597,13 +670,13 @@ def cmd_schema(m):
 def cmd_show(m, x):
     adj = adjacency(m)
     if isinstance(x, Node):
-        print(f"{x.path()}   ({m.lvname(x)})")
+        print(f"{x.path()}   ({m.lvname(x)})" + (f"   id {x.uid}" if x.uid else ""))
         for p in m.props.values():
             v, origin = m.resolve(x, p)
             print(f"  {p.name:<20} {str(v):<14} {origin}")
         i = cid(x)
     else:
-        print(f"{x.name}   ({x.type}, is-a {' > '.join(m.chain(x.type))})")
+        print(f"{x.name}   ({x.type}, is-a {' > '.join(m.chain(x.type))})" + (f"   id {x.uid}" if x.uid else ""))
         for k, v in eprops(m, x).items():
             print(f"  {k:<20} {v}")
         i = eid(x)
@@ -740,10 +813,12 @@ def flatten(m):
         out[f"entity_type {t.name}"] = {"parent": t.parent, "props": [p.line() for p in t.props.values()]}
     for r in m.rtypes.values():
         out[f"relation_type {r.name}"] = {"from": r.frm, "to": r.to, "inverse": r.inverse, "attrs": [p.line() for p in r.attrs.values()]}
+    if m.version is not None:
+        out["model"] = {"version": m.version}
     for n in m.all_nodes():
-        out[f"capability {n.path()}"] = dict(n.local)
+        out[f"capability {n.path()}"] = {**({"id": n.uid} if n.uid else {}), **n.local}
     for e in m.entities:
-        out[f"entity {e.name}"] = {"type": e.type, **e.local}
+        out[f"entity {e.name}"] = {"type": e.type, **({"id": e.uid} if e.uid else {}), **e.local}
         for r in e.rels:
             out[f"relation {e.name} {r['verb']} {target_text(r)}"] = dict(r["attrs"])
     return out
@@ -801,6 +876,10 @@ def main():
     cmd, rest = a[0], a[1:]
     if cmd == "diff" and len(rest) == 2:
         return cmd_diff(*rest)
+    if cmd == "ids":
+        return cmd_ids(rest)
+    if cmd == "version":
+        return cmd_version(rest)
     m = load(MODEL)
     if cmd == "tree":
         cmd_tree(m)
@@ -834,9 +913,9 @@ def main():
                   f"{sum(len(e.rels) for e in m.entities)} relations ({len(warns)} warning(s))")
         sys.exit(1 if errs or (warns and strict) else 0)
     elif cmd == "export":
-        print(json.dumps({"capabilities": [{"path": n.path(), "level": n.level(),
+        print(json.dumps({"version": m.version, "capabilities": [{"id": n.uid, "path": n.path(), "level": n.level(),
                                             "properties": {p.name: m.resolve(n, p)[0] for p in m.props.values()}} for n in m.all_nodes()],
-                          "entities": [{"name": e.name, "type": e.type, "properties": eprops(m, e)} for e in m.entities],
+                          "entities": [{"id": e.uid, "name": e.name, "type": e.type, "properties": eprops(m, e)} for e in m.entities],
                           "relations": [{"source": e.name, "relation": r["verb"], "target": target_text(r), **r["attrs"]}
                                         for e in m.entities for r in e.rels if r["target"]]}, indent=2))
     elif cmd == "add" and rest:
