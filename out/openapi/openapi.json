@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Capability model API",
-    "version": "1.0.0"
+    "title": "Enterprise capability model API",
+    "version": "2.1.0"
   },
   "paths": {
     "/capabilities": {
@@ -337,6 +337,70 @@
         }
       }
     },
+    "/users": {
+      "get": {
+        "summary": "List User entities",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create User",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/users/{name}": {
+      "get": {
+        "summary": "Get User",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/entities/{name}/exposes": {
       "get": {
         "summary": "exposes links (Asset|Team -> Capability)",
@@ -446,7 +510,8 @@
             "maximum": 4
           },
           "owner": {
-            "type": "string"
+            "type": "string",
+            "description": "Person or team accountable for the capability: its roadmap, budget and risk decisions. Set it on a domain or group and everything beneath inherits it unless it sets its own. Name a User or Team entity by its name, id or (for a User) email."
           },
           "criticality": {
             "type": "string",
@@ -454,10 +519,17 @@
               "low",
               "medium",
               "high"
-            ]
+            ],
+            "description": "How much the business suffers when this capability is unavailable or degraded. It sets recovery targets and how closely the capability is reviewed.",
+            "x-enumDescriptions": {
+              "low": "Can be down for days using workarounds, with little customer or financial impact.",
+              "medium": "Disruption hurts within a day, causing delays and manual workarounds but limited customer impact.",
+              "high": "An outage stops core operations or causes financial, legal or customer harm within hours. Needs a recovery plan, tested failover and named on-call support."
+            }
           },
           "review_cycle_days": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Days between scheduled reviews of the capability's owner, providers and maturity."
           },
           "maturity": {
             "type": "string",
@@ -466,7 +538,14 @@
               "pilot",
               "defined",
               "optimized"
-            ]
+            ],
+            "description": "How well established the way of delivering this capability is.",
+            "x-enumDescriptions": {
+              "initial": "Ad hoc; it depends on individuals and has no documented process.",
+              "pilot": "Being trialled in part of the organisation.",
+              "defined": "Documented, standard process used consistently.",
+              "optimized": "Measured and improved continuously."
+            }
           },
           "lifecycle": {
             "type": "string",
@@ -474,7 +553,13 @@
               "plan",
               "active",
               "retire"
-            ]
+            ],
+            "description": "Where the capability is in its life.",
+            "x-enumDescriptions": {
+              "plan": "Planned but not delivered yet.",
+              "active": "In use.",
+              "retire": "Being phased out. Nothing active may sit beneath it."
+            }
           }
         }
       },
@@ -493,10 +578,12 @@
         }
       },
       "Asset": {
+        "description": "Anything the business runs or owns that can provide or need capabilities.",
         "type": "object",
         "properties": {
           "owner": {
-            "type": "string"
+            "type": "string",
+            "description": "Team or person accountable for running the asset. Name a User or Team by its name, id or (for a User) email."
           },
           "lifecycle": {
             "type": "string",
@@ -504,7 +591,13 @@
               "plan",
               "active",
               "retire"
-            ]
+            ],
+            "description": "Where the asset is in its life.",
+            "x-enumDescriptions": {
+              "plan": "Planned or being built; it doesn't provide anything yet.",
+              "active": "In service.",
+              "retire": "Being decommissioned. It no longer counts as a provider of capabilities."
+            }
           },
           "name": {
             "type": "string"
@@ -538,6 +631,7 @@
         ]
       },
       "Application": {
+        "description": "A software product, bought or built.",
         "allOf": [
           {
             "$ref": "#/components/schemas/Asset"
@@ -546,13 +640,15 @@
             "type": "object",
             "properties": {
               "vendor": {
-                "type": "string"
+                "type": "string",
+                "description": "Supplier of the product, or \"internal\" for software built in-house."
               }
             }
           }
         ]
       },
       "Service": {
+        "description": "A shared technical service that other systems rely on.",
         "allOf": [
           {
             "$ref": "#/components/schemas/Asset"
@@ -564,10 +660,12 @@
         ]
       },
       "Team": {
+        "description": "A group of people that delivers or needs capabilities.",
         "type": "object",
         "properties": {
           "head": {
-            "type": "string"
+            "type": "string",
+            "description": "Person who leads the team. Name a User by its name, id or email."
           },
           "lifecycle": {
             "type": "string",
@@ -575,7 +673,13 @@
               "plan",
               "active",
               "retire"
-            ]
+            ],
+            "description": "Whether the team exists yet, is working, or is being wound down.",
+            "x-enumDescriptions": {
+              "plan": "Being formed.",
+              "active": "Working.",
+              "retire": "Being wound down. It no longer counts as a provider of capabilities."
+            }
           },
           "name": {
             "type": "string"
@@ -608,7 +712,62 @@
           "name"
         ]
       },
+      "User": {
+        "description": "A person with an identity in the organisation's systems.",
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Primary email address, used as the person's sign-in and contact address. It is a key: unique across users, and a reference to a User may use it instead of the name."
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "active",
+              "retire"
+            ],
+            "description": "Where the person's account is in its life.",
+            "x-enumDescriptions": {
+              "plan": "Being onboarded; the account is not in use yet.",
+              "active": "Account in use.",
+              "retire": "Offboarded; the account is disabled."
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "relations": {
+            "type": "object",
+            "properties": {
+              "exposes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_exposes"
+                }
+              },
+              "requires": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_requires"
+                }
+              },
+              "depends_on": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_depends_on"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "name",
+          "email"
+        ]
+      },
       "Link_exposes": {
+        "description": "The entity delivers this capability for the rest of the organisation.",
         "type": "object",
         "required": [
           "target"
@@ -627,13 +786,19 @@
                 "enum": [
                   "full",
                   "partial"
-                ]
+                ],
+                "description": "How much of the capability this entity delivers.",
+                "x-enumDescriptions": {
+                  "full": "Delivers the whole capability.",
+                  "partial": "Delivers only part of it; another provider is needed for the rest."
+                }
               }
             }
           }
         }
       },
       "Link_requires": {
+        "description": "The entity needs this capability to do its job. Something active must expose it.",
         "type": "object",
         "required": [
           "target"
@@ -652,13 +817,19 @@
                 "enum": [
                   "hard",
                   "soft"
-                ]
+                ],
+                "description": "What happens to the entity when nothing provides the capability.",
+                "x-enumDescriptions": {
+                  "hard": "It cannot operate. An unmet hard requirement is a break.",
+                  "soft": "It keeps running in a degraded way."
+                }
               }
             }
           }
         }
       },
       "Link_depends_on": {
+        "description": "The application calls or relies on another application or service at runtime.",
         "type": "object",
         "required": [
           "target"
@@ -678,7 +849,13 @@
                   "low",
                   "medium",
                   "high"
-                ]
+                ],
+                "description": "How badly the application suffers when the dependency fails.",
+                "x-enumDescriptions": {
+                  "low": "Hardly noticed, or easily worked around.",
+                  "medium": "Some features fail; the rest keeps working.",
+                  "high": "The application stops working."
+                }
               }
             }
           }

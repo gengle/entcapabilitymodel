@@ -1,10 +1,17 @@
-name,type,head,lifecycle,owner,vendor
-AP Operations,Team,Dana Reyes,active,,
-ApproveIt,Application,,active,Finance IT,
-ConfigService,Service,,active,,
-Corporate SSO,Service,,active,Identity Team,
-Match Engine,Application,,active,Finance IT,
-OCR Capture,Application,,active,,ScanCo
-PAM Vault,Service,,active,Identity Team,
-SAP S/4,Application,,active,Finance IT,SAP
-Talent Platform,Application,,active,,Acme HR Cloud
+id,name,type,head,lifecycle,owner,vendor,email
+0175f55c-0ba3-463e-a571-7a2078fada30,AP Operations,Team,Dana Reyes,active,,,
+15a48551-c293-4c1b-9237-6289eb6a0f72,ApproveIt,Application,,active,Finance IT,,
+c4dd3634-36a7-4f86-b8ee-cbbc17a46f92,CFO Office,Team,,active,,,
+38bb4851-c95c-4f28-b3cb-5168b1a8bcce,CIO Office,Team,,active,,,
+0a5297cb-bb4d-43b8-aeda-e5353554b464,ConfigService,Service,,active,Greg Engle,,
+2d83999f-aed2-41c1-8150-8578c55c84b7,Corporate SSO,Service,,active,Identity Team,,
+56afb6f6-a066-4f80-9e64-0be1a9ef4563,Dana Reyes,User,,active,,,dana@reyes.com
+40cc136c-7d11-47ef-a3a0-4ca3e151c3a1,Finance IT,Team,,active,,,
+296ee66b-3cd3-466d-94d1-4ab2bfb185a7,Greg Engle,User,,active,,,greg.engle@outlook.com
+a95fe9a4-7fa1-435b-bc80-5824ad1d7797,Identity Team,Team,,active,,,
+f0e4a2ea-91fc-409f-9a31-daf25ae76493,Match Engine,Application,,active,Finance IT,,
+13917cb1-88a4-4fab-8e1f-fcb1925437f3,OCR Capture,Application,,active,,ScanCo,
+9ad15bd8-ee30-4bd3-b7de-4d695793f773,PAM Vault,Service,,active,Identity Team,,
+317ba6a5-7d15-4b86-83af-9b037413e3c9,SAP S/4,Application,,active,Finance IT,SAP,
+be062647-b638-4730-bfb0-c2af1b69cbad,Talent Platform,Application,,active,,Acme HR Cloud,
+6d6d7021-bd6d-465b-931e-e4d8ed486951,Workday,Application,,active,,,

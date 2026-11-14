@@ -1,24 +1,25 @@
-path,name,level,owner,criticality,review_cycle_days,maturity,lifecycle
-Finance,Finance,1,CFO Office,high,90,initial,active
-Finance/Financial Planning,Financial Planning,2,CFO Office,medium,90,initial,active
-Finance/Financial Planning/Budgeting,Budgeting,3,CFO Office,medium,90,defined,active
-Finance/Financial Planning/Forecasting,Forecasting,3,CFO Office,medium,90,initial,active
-Finance/Accounts Payable,Accounts Payable,2,Dana Reyes,high,90,initial,active
-Finance/Accounts Payable/Invoice Management,Invoice Management,3,Dana Reyes,high,90,initial,active
-Finance/Accounts Payable/Invoice Management/Invoice Capture,Invoice Capture,4,Dana Reyes,high,90,defined,active
-Finance/Accounts Payable/Invoice Management/Three-Way Matching,Three-Way Matching,4,Dana Reyes,high,90,pilot,active
-Finance/Accounts Payable/Invoice Management/Invoice Approval,Invoice Approval,4,Dana Reyes,high,90,defined,active
-Finance/Accounts Payable/Supplier Payments,Supplier Payments,3,Dana Reyes,high,90,optimized,active
-Finance/Accounts Payable/Supplier Payments/Payment Run,Payment Run,4,Dana Reyes,high,90,optimized,active
-Finance/Accounts Payable/Supplier Payments/Payment Reconciliation,Payment Reconciliation,4,Dana Reyes,high,90,defined,active
-Human Resources,Human Resources,1,CHRO Office,medium,180,initial,active
-Human Resources/Talent Acquisition,Talent Acquisition,2,CHRO Office,medium,180,initial,active
-Human Resources/Talent Acquisition/Recruiting,Recruiting,3,CHRO Office,medium,180,initial,active
-Human Resources/Talent Acquisition/Recruiting/Candidate Sourcing,Candidate Sourcing,4,CHRO Office,medium,180,defined,active
-Human Resources/Talent Acquisition/Recruiting/Interview Scheduling,Interview Scheduling,4,CHRO Office,medium,180,initial,active
-Human Resources/Talent Acquisition/Onboarding,Onboarding,3,CHRO Office,medium,180,initial,active
-Technology,Technology,1,CIO Office,high,180,initial,active
-Technology/Security,Security,2,CIO Office,high,180,initial,active
-Technology/Security/Access Management,Access Management,3,CIO Office,high,180,initial,active
-Technology/Security/Access Management/Single Sign-On,Single Sign-On,4,CIO Office,high,180,optimized,active
-Technology/Security/Access Management/Privileged Access,Privileged Access,4,CIO Office,high,180,initial,active
+id,path,name,level,owner,criticality,review_cycle_days,maturity,lifecycle
+a76250ee-75eb-4a37-86c0-b271568fd7a5,Finance,Finance,1,CFO Office,high,90,initial,active
+99a8bc43-a1e7-46c7-9414-3a6e852716f3,Finance/Financial Planning,Financial Planning,2,CFO Office,medium,60,optimized,active
+cf2a5900-deb7-4934-a024-5bb1c5b0e35a,Finance/Financial Planning/Budgeting,Budgeting,3,CFO Office,medium,60,defined,active
+db698280-94d0-40ee-8be2-78dcb098b9ef,Finance/Financial Planning/Forecasting,Forecasting,3,CFO Office,medium,60,initial,active
+33964414-4557-44b1-bac4-3c9601fe20fc,Finance/Financial Planning/Test Yogo,Test Yogo,3,CFO Office,medium,180,initial,active
+d720a76b-d38b-48c9-a98a-dc48c9ddade0,Finance/Accounts Payable,Accounts Payable,2,Greg Engle,high,90,initial,active
+c1de3205-3aa1-4170-9903-5f8999b4c276,Finance/Accounts Payable/Invoice Management,Invoice Management,3,Greg Engle,high,90,initial,active
+d94e1bb4-8342-4000-94ad-bc5dd14b6e89,Finance/Accounts Payable/Invoice Management/Invoice Capture,Invoice Capture,4,Greg Engle,high,90,defined,active
+0a1c103f-8735-48f1-918e-1a0a470448b4,Finance/Accounts Payable/Invoice Management/Three-Way Matching,Three-Way Matching,4,Greg Engle,high,90,pilot,active
+9a278940-d178-4940-826d-ec46f9d25ce8,Finance/Accounts Payable/Invoice Management/Invoice Approval,Invoice Approval,4,Greg Engle,high,90,defined,active
+73f58141-72ca-46a4-b393-5495064cfc6e,Finance/Accounts Payable/Supplier Payments,Supplier Payments,3,Greg Engle,high,90,optimized,active
+3a1bf64c-c549-4a5f-bf74-ff8ab9645542,Finance/Accounts Payable/Supplier Payments/Payment Run,Payment Run,4,Greg Engle,high,90,optimized,active
+7c4657d2-f550-40a4-9b01-f59a53b3e25d,Finance/Accounts Payable/Supplier Payments/Payment Reconciliation,Payment Reconciliation,4,Greg Engle,high,90,defined,active
+c917784e-34bb-4df5-8731-c93730e87a69,Human Resources,Human Resources,1,Greg Engle,medium,180,initial,active
+a5d0e46f-2c31-4159-9228-bfc11e09f59b,Human Resources/Talent Acquisition,Talent Acquisition,2,Greg Engle,medium,180,initial,active
+ee6b8460-b267-40eb-853a-0634eec9d3d5,Human Resources/Talent Acquisition/Recruiting,Recruiting,3,Greg Engle,medium,180,initial,active
+1e627176-bb29-4dd7-93e3-b72ac474599f,Human Resources/Talent Acquisition/Recruiting/Candidate Sourcing,Candidate Sourcing,4,Greg Engle,medium,180,defined,active
+91b8099e-8daa-4d72-ba46-ff99c5f05095,Human Resources/Talent Acquisition/Recruiting/Interview Scheduling,Interview Scheduling,4,Greg Engle,medium,180,initial,active
+1cb49b32-0362-4210-8374-3d25cec210f3,Human Resources/Talent Acquisition/Onboarding,Onboarding,3,Greg Engle,medium,180,initial,active
+2f3d3fc6-f8e7-4a3d-a0f5-4e07189ae1cf,Technology,Technology,1,CIO Office,high,180,initial,active
+b11ba409-d5fb-4e95-9eeb-25d37d633ad5,Technology/Security,Security,2,CIO Office,high,180,initial,active
+0520ffdb-c5bd-4f6e-8129-d1ac022dd0d7,Technology/Security/Access Management,Access Management,3,CIO Office,high,180,initial,active
+d54cfb4b-b947-47bd-9b0e-afd63b888f19,Technology/Security/Access Management/Single Sign-On,Single Sign-On,4,CIO Office,high,180,optimized,active
+ce18fd25-f366-46a7-89f4-3a39afcb335e,Technology/Security/Access Management/Privileged Access,Privileged Access,4,CIO Office,high,180,initial,active

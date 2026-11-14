@@ -3,29 +3,50 @@ define
 
 attribute path, value string;
 attribute name, value string;
+# Person or team accountable for the capability: its roadmap, budget and risk decisions. Set it on a domain or group and everything beneath inherits it unless it sets its own. Name a User or Team entity by its name, id or (for a User) email.
 attribute owner, value string;
+# How much the business suffers when this capability is unavailable or degraded. It sets recovery targets and how closely the capability is reviewed.
 attribute criticality, value string;
+# Days between scheduled reviews of the capability's owner, providers and maturity.
 attribute review_cycle_days, value integer;
+# How well established the way of delivering this capability is.
 attribute maturity, value string;
+# Where the capability is in its life.
 attribute lifecycle, value string;
+# Supplier of the product, or "internal" for software built in-house.
 attribute vendor, value string;
+# Person who leads the team. Name a User by its name, id or email.
 attribute head, value string;
+# Primary email address, used as the person's sign-in and contact address. It is a key: unique across users, and a reference to a User may use it instead of the name.
+attribute email, value string;
+# How much of the capability this entity delivers.
 attribute exposes_coverage, value string;
+# What happens to the entity when nothing provides the capability.
 attribute requires_dependency, value string;
+# How badly the application suffers when the dependency fails.
 attribute depends_on_criticality, value string;
 
 entity capability, owns path @key, owns name, owns owner, owns criticality, owns review_cycle_days, owns maturity, owns lifecycle, plays capability_hierarchy:parent, plays capability_hierarchy:child, plays exposes:target, plays requires:target;
 relation capability_hierarchy, relates parent, relates child;
+# Anything the business runs or owns that can provide or need capabilities.
 entity asset, owns name @key, owns owner, owns lifecycle;
+# A software product, bought or built.
 entity application sub asset, owns vendor;
+# A shared technical service that other systems rely on.
 entity service sub asset;
+# A group of people that delivers or needs capabilities.
 entity team, owns name @key, owns head, owns lifecycle;
+# A person with an identity in the organisation's systems.
+entity user, owns name @key, owns email, owns lifecycle;
+# The entity delivers this capability for the rest of the organisation.
 relation exposes, relates source, relates target, owns exposes_coverage;
 asset plays exposes:source;
 team plays exposes:source;
+# The entity needs this capability to do its job. Something active must expose it.
 relation requires, relates source, relates target, owns requires_dependency;
 asset plays requires:source;
 team plays requires:source;
+# The application calls or relies on another application or service at runtime.
 relation depends_on, relates source, relates target, owns depends_on_criticality;
 application plays depends_on:source;
 application plays depends_on:target;

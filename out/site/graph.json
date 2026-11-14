@@ -12,6 +12,7 @@
   "cap:Finance/Financial Planning",
   "cap:Finance/Financial Planning/Budgeting",
   "cap:Finance/Financial Planning/Forecasting",
+  "cap:Finance/Financial Planning/Test Yogo",
   "cap:Human Resources",
   "cap:Human Resources/Talent Acquisition",
   "cap:Human Resources/Talent Acquisition/Onboarding",
@@ -25,12 +26,20 @@
   "cap:Technology/Security/Access Management/Single Sign-On",
   "ent:AP Operations",
   "ent:ApproveIt",
+  "ent:CFO Office",
+  "ent:CIO Office",
+  "ent:ConfigService",
   "ent:Corporate SSO",
+  "ent:Dana Reyes",
+  "ent:Finance IT",
+  "ent:Greg Engle",
+  "ent:Identity Team",
   "ent:Match Engine",
   "ent:OCR Capture",
   "ent:PAM Vault",
   "ent:SAP S/4",
-  "ent:Talent Platform"
+  "ent:Talent Platform",
+  "ent:Workday"
  ],
  "edges": [
   {
@@ -49,6 +58,12 @@
    "s": "cap:Finance/Financial Planning",
    "rel": "parent_of",
    "d": "cap:Finance/Financial Planning/Forecasting",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Finance/Financial Planning",
+   "rel": "parent_of",
+   "d": "cap:Finance/Financial Planning/Test Yogo",
    "attrs": {}
   },
   {
@@ -168,6 +183,12 @@
    }
   },
   {
+   "s": "ent:AP Operations",
+   "rel": "exposes",
+   "d": "cap:Finance/Financial Planning/Forecasting",
+   "attrs": {}
+  },
+  {
    "s": "ent:ApproveIt",
    "rel": "requires",
    "d": "cap:Technology/Security/Access Management/Single Sign-On",
@@ -196,9 +217,27 @@
    }
   },
   {
+   "s": "ent:ConfigService",
+   "rel": "exposes",
+   "d": "cap:Human Resources/Talent Acquisition/Onboarding",
+   "attrs": {}
+  },
+  {
    "s": "ent:Corporate SSO",
    "rel": "exposes",
    "d": "cap:Technology/Security/Access Management/Single Sign-On",
+   "attrs": {}
+  },
+  {
+   "s": "ent:Corporate SSO",
+   "rel": "exposes",
+   "d": "cap:Human Resources/Talent Acquisition/Recruiting/Candidate Sourcing",
+   "attrs": {}
+  },
+  {
+   "s": "ent:Corporate SSO",
+   "rel": "exposes",
+   "d": "cap:Finance/Financial Planning/Test Yogo",
    "attrs": {}
   },
   {
@@ -277,6 +316,78 @@
    "s": "ent:Talent Platform",
    "rel": "exposes",
    "d": "cap:Human Resources/Talent Acquisition/Recruiting",
+   "attrs": {}
+  },
+  {
+   "s": "ent:Workday",
+   "rel": "exposes",
+   "d": "cap:Human Resources/Talent Acquisition/Recruiting/Interview Scheduling",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Finance",
+   "rel": "owner",
+   "d": "ent:CFO Office",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Finance/Accounts Payable",
+   "rel": "owner",
+   "d": "ent:Greg Engle",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Human Resources",
+   "rel": "owner",
+   "d": "ent:Greg Engle",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Technology",
+   "rel": "owner",
+   "d": "ent:CIO Office",
+   "attrs": {}
+  },
+  {
+   "s": "ent:AP Operations",
+   "rel": "head",
+   "d": "ent:Dana Reyes",
+   "attrs": {}
+  },
+  {
+   "s": "ent:ApproveIt",
+   "rel": "owner",
+   "d": "ent:Finance IT",
+   "attrs": {}
+  },
+  {
+   "s": "ent:ConfigService",
+   "rel": "owner",
+   "d": "ent:Greg Engle",
+   "attrs": {}
+  },
+  {
+   "s": "ent:Corporate SSO",
+   "rel": "owner",
+   "d": "ent:Identity Team",
+   "attrs": {}
+  },
+  {
+   "s": "ent:Match Engine",
+   "rel": "owner",
+   "d": "ent:Finance IT",
+   "attrs": {}
+  },
+  {
+   "s": "ent:PAM Vault",
+   "rel": "owner",
+   "d": "ent:Identity Team",
+   "attrs": {}
+  },
+  {
+   "s": "ent:SAP S/4",
+   "rel": "owner",
+   "d": "ent:Finance IT",
    "attrs": {}
   }
  ]
