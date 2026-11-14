@@ -119,15 +119,15 @@ class Model:
         return n if n is not self.top else None
 
     def find_cap(self, text):
-        n = self.find(text) or next((x for x in self.all_nodes() if x.uid and x.uid.lower() == text.lower()), None)
+        low = text.lower()
+        n = self.find(text) or next((x for x in self.all_nodes() if x.uid and x.uid.lower() == low), None)
         if n:
             return n, None
-        if "/" not in text:
-            hits = [x for x in self.all_nodes() if x.name.lower() == text.lower()]
-            if len(hits) == 1:
-                return hits[0], None
-            if len(hits) > 1:
-                return None, f"'{text}' is ambiguous: " + ", ".join(h.path() for h in hits)
+        hits = [x for x in self.all_nodes() if x.name.lower() == low] if "/" not in text else []
+        if len(hits) == 1:
+            return hits[0], None
+        if hits:
+            return None, f"'{text}' is ambiguous: " + ", ".join(h.path() for h in hits)
         return None, f"no such capability '{text}'"
 
     def depth_limit(self):

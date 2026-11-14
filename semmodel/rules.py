@@ -91,46 +91,62 @@ def unresolved(m, where, p, v):
     return f"{where}: {p.name} '{v}' is not a known {' or '.join(p.targets)} (match by {m.ref_keys(p)})"
 
 
-def validate(m):
-    errs, warns = list(getattr(m, "load_errors", [])), []
-    limit = m.depth_limit()
+def dups(names):
+    """Lower-cased names that occur more than once (set order, as before)."""
+    names = [x.lower() for x in names]
+    return {x for x in names if names.count(x) > 1}
+
+
+def check_entity_types(m, errs, warns):
     for t in m.etypes.values():
         if t.parent and t.parent not in m.etypes:
             errs.append(f"entity_type {t.name}: unknown parent '{t.parent}'")
         elif len(m.chain(t.name)) != len({*m.chain(t.name)}) or (t.parent and t.name in m.chain(t.parent)):
             errs.append(f"entity_type {t.name}: inheritance cycle")
-    known = set(m.etypes) | {"Capability", "*"}
-    scopes = [(m.root_name, m.props)] + [(f"entity_type {t.name}", t.props) for t in m.etypes.values()]         + [(f"relation {r.name}", r.attrs) for r in m.rtypes.values()]
-    for where, props in scopes:
+
+
+def prop_scopes(m):
+    """(label, props) for the root, every entity type and every relation type's attrs."""
+    return [(m.root_name, m.props)] + [(f"entity_type {t.name}", t.props) for t in m.etypes.values()] \
+        + [(f"relation {r.name}", r.attrs) for r in m.rtypes.values()]
+
+
+def check_ref_targets(m, errs, warns):
+    for where, props in prop_scopes(m):
         for p in props.values():
-            for x in p.targets:
-                if x not in m.etypes and x != "*":
-                    errs.append(f"{where}: {p.name}: ref to unknown entity type '{x}'")
-    for t in m.etypes.values():  # a key prop identifies one entity, so its values must be unique
+            errs.extend(f"{where}: {p.name}: ref to unknown entity type '{x}'"
+                        for x in p.targets if x not in m.etypes and x != "*")
+
+
+def check_keys(m, errs, warns):
+    """A key prop identifies one entity, so its values must be unique."""
+    for t in m.etypes.values():
         for k, p in t.props.items():
             if p.key:
                 vals = [str(e.local[k]).lower() for e in m.entities if k in e.local and m.conforms(e.type, [t.name])]
                 for d in sorted({v for v in vals if vals.count(v) > 1}):
                     errs.append(f"entity_type {t.name}: key '{k}' value '{d}' is used by more than one entity")
-    invs = {}
+
+
+def check_relation_types(m, errs, warns):
+    known, invs = set(m.etypes) | {"Capability", "*"}, set()
     for rt in m.rtypes.values():
         for side, names in (("from", rt.frm), ("to", rt.to)):
             if not names:
                 errs.append(f"relation {rt.name}: missing '{side}'")
-            for x in names:
-                if x not in known:
-                    errs.append(f"relation {rt.name}: unknown type '{x}' in {side}")
-        for x in rt.satisfied_by + rt.conflicts:
-            if x not in m.rtypes:
-                errs.append(f"relation {rt.name}: refers to unknown relation '{x}'")
+            errs.extend(f"relation {rt.name}: unknown type '{x}' in {side}" for x in names if x not in known)
+        errs.extend(f"relation {rt.name}: refers to unknown relation '{x}'"
+                    for x in rt.satisfied_by + rt.conflicts if x not in m.rtypes)
         if rt.inverse:
             if rt.inverse in m.rtypes or rt.inverse in invs:
                 errs.append(f"relation {rt.name}: inverse '{rt.inverse}' clashes with another name")
-            invs[rt.inverse] = 1
+            invs.add(rt.inverse)
+
+
+def check_capabilities(m, errs, warns):
     for parent in [m.top] + m.all_nodes():
-        names = [c.name.lower() for c in parent.children]
-        for d in {x for x in names if names.count(x) > 1}:
-            errs.append(f"{parent.path() or '(root)'}: duplicate child '{d}'")
+        errs.extend(f"{parent.path() or '(root)'}: duplicate child '{d}'" for d in dups(c.name for c in parent.children))
+    limit = m.depth_limit()
     for n in m.all_nodes():
         where = n.path()
         if n.level() > limit:
@@ -149,100 +165,136 @@ def validate(m):
             if p.required and v is None:
                 errs.append(f"{where}: required '{p.name}' is unset (set it here or on an ancestor)")
         if "no_active_under_retired" in m.rules and "lifecycle" in m.props:
-            try:
-                lp, a = m.props["lifecycle"], n.parent
-                mine = m.resolve(n, lp)[0]
-                while a is not None and a.parent is not None:
-                    if mine == "active" and m.resolve(a, lp)[0] == "retire":
-                        errs.append(f"{where}: active under retired ancestor {a.path()}")
-                        break
-                    a = a.parent
-            except ValueError:
-                pass
-    names = [e.name.lower() for e in m.entities]
-    for d in {x for x in names if names.count(x) > 1}:
-        errs.append(f"duplicate entity '{d}'")
-    for e in m.entities:
-        w = f"entity {e.name}"
-        if e.type not in m.etypes:
-            errs.append(f"{w}: unknown entity type '{e.type}' (defined: {', '.join(m.etypes) or 'none'})")
-            defs = {}
-        else:
-            defs = m.eprop_defs(e.type)
-        for k, v in e.local.items():
-            if k not in defs:
-                errs.append(f"{w}: unknown property '{k}' for type {e.type}")
-            else:
-                try:
-                    defs[k].coerce(v)
-                except ValueError as x:
-                    errs.append(f"{w}: {x}")
-                if defs[k].type == "ref" and m.ref(defs[k], v) is None:
-                    warns.append(unresolved(m, w, defs[k], v))
-        for p in defs.values():
-            if p.required and e.local.get(p.name, p.default) is None:
-                errs.append(f"{w}: required '{p.name}' is unset")
-        seen = set()
-        for r in e.rels:
-            rt = m.rtypes.get(r["verb"])
-            if r["err"]:
-                errs.append(f"{w}: {r['verb']} {r['text']}: {r['err']}")
-                continue
-            t, tname = r["target"], target_text(r)
-            if e.type in m.etypes and not m.conforms(e.type, rt.frm):
-                errs.append(f"{w}: {e.type} cannot be the source of '{rt.name}' (allowed: {'|'.join(rt.frm)})")
-            if isinstance(t, Entity):
-                if t is e:
-                    errs.append(f"{w}: {rt.name} to itself")
-                if not m.conforms(t.type, rt.to):
-                    errs.append(f"{w}: {rt.name} {tname} is a {t.type}; relation allows {'|'.join(rt.to)}")
-            elif "Capability" not in rt.to and "*" not in rt.to:
-                errs.append(f"{w}: {rt.name} targets {'|'.join(rt.to)}, not a capability")
-            for k, v in r["attrs"].items():
-                if k not in rt.attrs:
-                    errs.append(f"{w}: {rt.name} {tname}: unknown attribute '{k}' (allowed: {', '.join(rt.attrs) or 'none'})")
-                else:
-                    try:
-                        rt.attrs[k].coerce(v)
-                    except ValueError as x:
-                        errs.append(f"{w}: {rt.name} {tname}: {x}")
-            if isinstance(t, Node) and rt.min_level and t.level() < rt.min_level:
-                errs.append(f"{w}: {rt.name} {tname} is L{t.level()}; this relation is only allowed at L{rt.min_level} or deeper")
-            if (rt.name, id(t)) in seen:
-                errs.append(f"{w}: duplicate {rt.name} {tname}")
-            seen.add((rt.name, id(t)))
-            for c in rt.conflicts:
-                if (c, id(t)) in seen:
-                    errs.append(f"{w}: both {rt.name} and {c} {tname}")
-            for c, tid in list(seen):
-                if c in m.rtypes and rt.name in m.rtypes[c].conflicts and tid == id(t):
-                    errs.append(f"{w}: both {c} and {rt.name} {tname}")
-    for rt in m.rtypes.values():
-        if rt.no_cycles:
-            adj = collections.defaultdict(list)
-            for e in m.entities:
-                for r in e.rels:
-                    if r["verb"] == rt.name and isinstance(r["target"], Entity):
-                        adj[e.name].append(r["target"].name)
-            state = {}
+            check_active_under_retired(m, n, errs)
 
-            def dfs(u, trail):
-                state[u] = 1
-                for v in adj[u]:
-                    if state.get(v) == 1:
-                        errs.append(f"{rt.name} cycle: " + " -> ".join(trail + [u, v]))
-                    elif v not in state:
-                        dfs(v, trail + [u])
-                state[u] = 2
-            for u in list(adj):
-                if u not in state:
-                    dfs(u, [])
+
+def check_active_under_retired(m, n, errs):
+    lp = m.props["lifecycle"]
+    try:
+        if m.resolve(n, lp)[0] != "active":
+            return
+        a = n.parent
+        while a is not None and a.parent is not None:
+            if m.resolve(a, lp)[0] == "retire":
+                errs.append(f"{n.path()}: active under retired ancestor {a.path()}")
+                return
+            a = a.parent
+    except ValueError:
+        pass
+
+
+def check_entity_props(m, e, defs, errs, warns):
+    w = f"entity {e.name}"
+    for k, v in e.local.items():
+        if k not in defs:
+            errs.append(f"{w}: unknown property '{k}' for type {e.type}")
+            continue
+        try:
+            defs[k].coerce(v)
+        except ValueError as x:
+            errs.append(f"{w}: {x}")
+        if defs[k].type == "ref" and m.ref(defs[k], v) is None:
+            warns.append(unresolved(m, w, defs[k], v))
+    errs.extend(f"{w}: required '{p.name}' is unset" for p in defs.values()
+                if p.required and e.local.get(p.name, p.default) is None)
+
+
+def check_relation_instances(m, e, errs, warns):
+    w, seen = f"entity {e.name}", set()
+    for r in e.rels:
+        rt = m.rtypes.get(r["verb"])
+        if r["err"]:
+            errs.append(f"{w}: {r['verb']} {r['text']}: {r['err']}")
+            continue
+        t, tname = r["target"], target_text(r)
+        if e.type in m.etypes and not m.conforms(e.type, rt.frm):
+            errs.append(f"{w}: {e.type} cannot be the source of '{rt.name}' (allowed: {'|'.join(rt.frm)})")
+        if isinstance(t, Entity):
+            if t is e:
+                errs.append(f"{w}: {rt.name} to itself")
+            if not m.conforms(t.type, rt.to):
+                errs.append(f"{w}: {rt.name} {tname} is a {t.type}; relation allows {'|'.join(rt.to)}")
+        elif "Capability" not in rt.to and "*" not in rt.to:
+            errs.append(f"{w}: {rt.name} targets {'|'.join(rt.to)}, not a capability")
+        for k, v in r["attrs"].items():
+            if k not in rt.attrs:
+                errs.append(f"{w}: {rt.name} {tname}: unknown attribute '{k}' (allowed: {', '.join(rt.attrs) or 'none'})")
+                continue
+            try:
+                rt.attrs[k].coerce(v)
+            except ValueError as x:
+                errs.append(f"{w}: {rt.name} {tname}: {x}")
+        if isinstance(t, Node) and rt.min_level and t.level() < rt.min_level:
+            errs.append(f"{w}: {rt.name} {tname} is L{t.level()}; this relation is only allowed at L{rt.min_level} or deeper")
+        if (rt.name, id(t)) in seen:
+            errs.append(f"{w}: duplicate {rt.name} {tname}")
+        seen.add((rt.name, id(t)))
+        errs.extend(f"{w}: both {rt.name} and {c} {tname}" for c in rt.conflicts if (c, id(t)) in seen)
+        for c, tid in list(seen):
+            if c in m.rtypes and rt.name in m.rtypes[c].conflicts and tid == id(t):
+                errs.append(f"{w}: both {c} and {rt.name} {tname}")
+
+
+def check_entities(m, errs, warns):
+    errs.extend(f"duplicate entity '{d}'" for d in dups(e.name for e in m.entities))
+    for e in m.entities:
+        if e.type in m.etypes:
+            defs = m.eprop_defs(e.type)
+        else:
+            errs.append(f"entity {e.name}: unknown entity type '{e.type}' (defined: {', '.join(m.etypes) or 'none'})")
+            defs = {}
+        check_entity_props(m, e, defs, errs, warns)
+        check_relation_instances(m, e, errs, warns)
+
+
+def check_no_cycles(m, errs, warns):
+    for rt in m.rtypes.values():
+        if not rt.no_cycles:
+            continue
+        adj = collections.defaultdict(list)
+        for e in m.entities:
+            for r in e.rels:
+                if r["verb"] == rt.name and isinstance(r["target"], Entity):
+                    adj[e.name].append(r["target"].name)
+        state = {}
+
+        def dfs(u, trail):
+            state[u] = 1
+            for v in adj[u]:
+                if state.get(v) == 1:
+                    errs.append(f"{rt.name} cycle: " + " -> ".join(trail + [u, v]))
+                elif v not in state:
+                    dfs(v, trail + [u])
+            state[u] = 2
+        for u in list(adj):
+            if u not in state:
+                dfs(u, [])
+
+
+def check_ids(m, errs, warns):
     if getattr(m, "yaml", False):
         validate_ids(m, errs, warns)
+
+
+def dependency(r):
+    return r["attrs"].get("dependency", "hard")
+
+
+def check_unmet(m, errs, warns):
     for e, r, rt in unmet(m):
-        sev = r["attrs"].get("dependency", "hard")
+        sev = dependency(r)
         msg = f"{e.name} {rt.name} {r['target'].path()} ({sev}) but no active entity {'/'.join(rt.satisfied_by)} it"
         (errs if m.rules.get("unmet_requirements") == "error" and sev == "hard" else warns).append(msg)
+
+
+RULES = [check_entity_types, check_ref_targets, check_keys, check_relation_types, check_capabilities,
+         check_entities, check_no_cycles, check_ids, check_unmet]
+
+
+def validate(m):
+    errs, warns = list(getattr(m, "load_errors", [])), []
+    for rule in RULES:
+        rule(m, errs, warns)
     return errs, warns
 
 
