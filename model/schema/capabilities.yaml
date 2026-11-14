@@ -1,4 +1,7 @@
 # The capability tree: its levels, the properties every capability has, and model-wide rules.
+# A property is either a spec string ("enum(a,b) = a inherit required") or a mapping that can also document it:
+#   {type, description, values: [a, b] or {a: meaning, b: meaning}, default, inherit, required}
+# type ref points at an entity: {type: ref, to: [User, Team]}; a value is that entity's name, id or a key prop (email).
 kind: Schema
 root: Capability
 levels:
@@ -7,11 +10,50 @@ levels:
   3: Capability
   4: Sub-capability
 props:
-  owner: string inherit required
-  criticality: enum(low,medium,high) = medium inherit
-  review_cycle_days: int = 180 inherit
-  maturity: enum(initial,pilot,defined,optimized) = initial
-  lifecycle: enum(plan,active,retire) = active
+  owner:
+    type: ref
+    to: [User, Team]
+    description: >-
+      Person or team accountable for the capability: its roadmap, budget and risk decisions.
+      Set it on a domain or group and everything beneath inherits it unless it sets its own.
+      Name a User or Team entity by its name, id or (for a User) email.
+    inherit: true
+    required: true
+  criticality:
+    type: enum
+    description: >-
+      How much the business suffers when this capability is unavailable or degraded.
+      It sets recovery targets and how closely the capability is reviewed.
+    values:
+      low: Can be down for days using workarounds, with little customer or financial impact.
+      medium: Disruption hurts within a day, causing delays and manual workarounds but limited customer impact.
+      high: >-
+        An outage stops core operations or causes financial, legal or customer harm within hours.
+        Needs a recovery plan, tested failover and named on-call support.
+    default: medium
+    inherit: true
+  review_cycle_days:
+    type: int
+    description: Days between scheduled reviews of the capability's owner, providers and maturity.
+    default: 180
+    inherit: true
+  maturity:
+    type: enum
+    description: How well established the way of delivering this capability is.
+    values:
+      initial: Ad hoc; it depends on individuals and has no documented process.
+      pilot: Being trialled in part of the organisation.
+      defined: Documented, standard process used consistently.
+      optimized: Measured and improved continuously.
+    default: initial
+  lifecycle:
+    type: enum
+    description: Where the capability is in its life.
+    values:
+      plan: Planned but not delivered yet.
+      active: In use.
+      retire: Being phased out. Nothing active may sit beneath it.
+    default: active
 rules:
   no_active_under_retired: true
   unmet_requirements: warn

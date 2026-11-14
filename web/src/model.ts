@@ -9,7 +9,8 @@ export type Route =
   | { k: "forms" }
   | { k: "file"; path: string }
   | { k: "ent"; id: string }
-  | { k: "cap"; id: string };
+  | { k: "cap"; id: string }
+  | { k: "id"; uid: string };
 
 export function parseHash(hash: string): Route {
   const [kind, ...rest] = hash.replace(/^#\/?/, "").split("/");
@@ -19,11 +20,26 @@ export function parseHash(hash: string): Route {
   if (kind === "file" && arg) return { k: "file", path: arg };
   if (kind === "ent" && arg) return { k: "ent", id: "ent:" + arg };
   if (kind === "cap" && arg) return { k: "cap", id: "cap:" + arg };
+  if (kind === "id" && arg) return { k: "id", uid: arg };
   return { k: "overview" };
 }
 
 export const href = (id: string) => `#/${id.slice(0, 3)}/${encodeURIComponent(id.slice(4))}`;
 export const fileHref = (path: string) => `#/file/${encodeURIComponent(path)}`;
+export const idHref = (uid: string) => `#/id/${uid}`;
+
+const normUid = (s: string) => s.toLowerCase().replace(/[^0-9a-f]/g, "");
+/** True when text could be an id or id prefix: at least 4 hex digits, only hex digits and hyphens. */
+export const looksLikeUid = (text: string) => /^\{?[0-9a-f-]+\}?$/i.test(text.trim()) && normUid(text).length >= 4;
+
+/** Capabilities and entities whose id is text or starts with it (case and hyphens ignored), like sem.locate. */
+export function locateUid(idx: Index, text: string): (Cap | Ent)[] {
+  if (!looksLikeUid(text)) return [];
+  const q = normUid(text);
+  const all = [...idx.caps.values(), ...idx.ents.values()].filter((x) => x.uid);
+  const exact = all.filter((x) => normUid(x.uid!) === q);
+  return exact.length ? exact : all.filter((x) => normUid(x.uid!).startsWith(q));
+}
 export const label = (id: string) => (id.startsWith("cap:") ? id.slice(4).split("/").pop()! : id.slice(4));
 
 export interface Index {
@@ -83,6 +99,12 @@ export interface Ctx {
   /** Apply a structured edit to a file's draft (it then previews like a typed edit). False if it could not. */
   mutate: (path: string, edit: Edit) => boolean;
   save: () => void;
+  /** Save one file's draft (not necessarily the open one). */
+  saveFile: (path: string) => void;
+  /** mutate() for any file; loads it as a draft first if it isn't open. */
+  mutateFile: (path: string, edit: Edit) => Promise<boolean>;
+  /** Throw away a file's unsaved changes (form and text edits alike), back to what is on disk. */
+  revert: (path: string) => void;
   /** Saved snapshot from a server action (assign ids, set version); null on failure (a notice is shown). */
   run: (what: Promise<Snapshot>, done: string) => Promise<boolean>;
 }

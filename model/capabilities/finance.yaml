@@ -24,3 +24,5 @@ children:
         id: db698280-94d0-40ee-8be2-78dcb098b9ef
       - name: Test Yogo
         id: 33964414-4557-44b1-bac4-3c9601fe20fc
+        props:
+          review_cycle_days: 180

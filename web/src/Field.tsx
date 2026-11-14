@@ -12,8 +12,9 @@ export function Field(props: {
   suggestions?: string[];
   label?: string;
   fallback?: string | null; // the value that applies when nothing is set here
+  docs?: Record<string, string>; // enum value -> meaning, shown as option/radio tooltips
 }) {
-  const { ui, value, emptyLabel, onCommit, clearable = true, suggestions = [], label } = props;
+  const { ui, value, emptyLabel, onCommit, clearable = true, suggestions = [], label, docs = {} } = props;
   const [v, setV] = useState(value ?? "");
   useEffect(() => setV(value ?? ""), [value]);
   const listId = useId();
@@ -49,7 +50,7 @@ export function Field(props: {
               — {emptyLabel} —
             </option>
             {opts.map((o) => (
-              <option key={o} value={o}>
+              <option key={o} value={o} title={docs[o]}>
                 {off(o)}
               </option>
             ))}
@@ -60,7 +61,7 @@ export function Field(props: {
       return (
         <span className="ctl radios" role="radiogroup" aria-label={label}>
           {opts.map((o) => (
-            <label key={o} className={v === o ? "on" : ""}>
+            <label key={o} className={v === o ? "on" : ""} title={docs[o]}>
               <input type="radio" name={name} checked={v === o} onChange={() => commit(o)} />
               {off(o)}
             </label>

@@ -9,3 +9,4 @@ relations:
     - Payment Reconciliation
     - target: Invoice Approval
       coverage: partial
+    - Forecasting

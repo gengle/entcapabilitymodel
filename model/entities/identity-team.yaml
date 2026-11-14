@@ -1,0 +1,6 @@
+kind: Entity
+type: Team
+name: "Identity Team"
+id: a95fe9a4-7fa1-435b-bc80-5824ad1d7797
+props: {}
+relations: {}

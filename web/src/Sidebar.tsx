@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { fileHref, groupBy, href, useModel, type Route } from "./model";
+import { fileHref, groupBy, href, locateUid, looksLikeUid, useModel, type Route } from "./model";
+import { IdMatches } from "./views";
 import type { Cap } from "./types";
 
 type Tab = "files" | "caps" | "ents";
@@ -35,13 +36,26 @@ export function Sidebar({ route, active, onCreate }: { route: Route; active: str
           </button>
         ))}
       </div>
-      <input className="filter" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <input className="filter" placeholder="Filter, or paste an id…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <nav className="side-list">
+        {looksLikeUid(f) && <IdSearch text={f} />}
         {tab === "files" && <Files f={f} active={active} />}
         {tab === "caps" && <Caps f={f} routeId={routeId} />}
         {tab === "ents" && <Ents f={f} routeId={routeId} onCreate={onCreate} />}
       </nav>
     </aside>
+  );
+}
+
+/** Objects whose id matches what is typed in the filter, whichever tab is open. */
+function IdSearch({ text }: { text: string }) {
+  const { idx } = useModel();
+  const hits = locateUid(idx, text);
+  return (
+    <div className="dir id-search">
+      <div className="dir-name">Id {hits.length ? `matches (${hits.length})` : "— no match"}</div>
+      {hits.length > 0 && <IdMatches hits={hits} />}
+    </div>
   );
 }
 

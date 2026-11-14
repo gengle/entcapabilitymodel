@@ -6,6 +6,7 @@ GET  /api/model                       snapshot: schema, capability tree, entitie
 GET  /api/version                     changes whenever a YAML file under the model folder changes (poll it)
 GET  /api/file?path=entities/x.yaml   raw file content
 GET  /api/impact?entity=Name          what retiring/removing an entity would break
+GET  /api/locate?id=<uuid or prefix>  the capabilities/entities with that id (or id prefix): route id, file, line
 POST /api/preview {files: {path: content}}  snapshot as if those files had that content (nothing is written)
 PUT  /api/file {path, content, force} write a file; rejected (422) if it adds validation errors, unless force
 DELETE /api/file?path=...             delete a file; same rule
@@ -66,7 +67,8 @@ def load(overrides=None):
 # ------------------------------------------------------------------ snapshot
 def prop_json(p):
     return {"name": p.name, "type": p.type, "enum": p.enum, "default": p.default,
-            "inherit": p.inherit, "required": p.required, "spec": p.line()}
+            "inherit": p.inherit, "required": p.required, "spec": p.line(),
+            "description": p.description, "valueDocs": p.docs, "to": p.targets or None, "key": p.key}
 
 
 def snapshot(m):
@@ -80,6 +82,13 @@ def snapshot(m):
                 rt = m.rtypes[r["verb"]]
                 incoming[sem.nid(r["target"])].append({"verb": rt.name, "inverse": rt.inverse or f"~{rt.name}",
                                                        "from": sem.eid(e), "attrs": r["attrs"], "src": r.get("src")})
+    for x, p, t in sem.refs(m):  # ref props (e.g. owner) point at entities too
+        incoming[sem.eid(t)].append({"verb": p.name, "inverse": f"{p.name}_of", "from": sem.nid(x), "attrs": {},
+                                     "src": x.prop_src.get(p.name)})
+
+    def ref_id(p, v):
+        t = m.ref(p, v)
+        return sem.eid(t) if t else None
 
     def cap(n):
         props = []
@@ -94,7 +103,7 @@ def snapshot(m):
             elif origin.startswith("inherited from "):
                 a = m.find(origin[len("inherited from "):])
                 src = a and a.prop_src.get(p.name)
-            props.append({"name": p.name, "value": v, "origin": origin, "src": src})
+            props.append({"name": p.name, "value": v, "origin": origin, "src": src, "ref": ref_id(p, v)})
         direct = [sem.eid(e) for e in ents if any(r["verb"] in verbs and r["target"] is n for r in e.rels)]
         rolled = [sem.eid(e) for e in sem.providers(m, n)]
         status = None if n.level() < min_lv else "white" if not rolled else "overlap" if len(direct) >= 2 else "ok"
@@ -107,12 +116,14 @@ def snapshot(m):
         defs = m.eprop_defs(e.type) if e.type in m.etypes else {}
         props = [{"name": k, "value": e.local.get(k, p.default),
                   "origin": "local" if k in e.local else "default" if p.default is not None else "unset",
-                  "src": e.prop_src.get(k)} for k, p in defs.items()]
-        props += [{"name": k, "value": v, "origin": "unknown", "src": e.prop_src.get(k)} for k, v in e.local.items() if k not in defs]
+                  "src": e.prop_src.get(k), "ref": ref_id(p, e.local.get(k, p.default))} for k, p in defs.items()]
+        props += [{"name": k, "value": v, "origin": "unknown", "src": e.prop_src.get(k), "ref": None}
+                  for k, v in e.local.items() if k not in defs]
         rels = [{"verb": r["verb"], "text": r["text"], "target": sem.nid(r["target"]) if r["target"] is not None else None,
                  "label": sem.target_text(r), "attrs": r["attrs"], "src": r.get("src"), "err": r["err"]} for r in e.rels]
         return {"id": sem.eid(e), "uid": e.uid, "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
-                "retired": sem.retired(e), "props": props, "relations": rels, "incoming": incoming[sem.eid(e)]}
+                "retired": sem.retired(e), "props": props, "relations": rels, "incoming": incoming[sem.eid(e)],
+                "impact": impact_json(m, e)}
 
     entities = [ent(e) for e in ents]
     owners = [(f"entity {e.name}:", e.src) for e in ents] + [(f"{e.name} ", e.src) for e in ents]
@@ -150,9 +161,9 @@ def snapshot(m):
 
     rtypes = [{"name": r.name, "from": r.frm, "to": r.to, "attrs": [prop_json(p) for p in r.attrs.values()],
                "inverse": r.inverse, "minLevel": r.min_level, "satisfiedBy": r.satisfied_by, "conflictsWith": r.conflicts,
-               "transitive": r.transitive, "noCycles": r.no_cycles} for r in m.rtypes.values()]
+               "transitive": r.transitive, "noCycles": r.no_cycles, "description": r.description} for r in m.rtypes.values()]
     etypes = [{"name": t.name, "parent": t.parent, "chain": m.chain(t.name), "props": [prop_json(p) for p in t.props.values()],
-               "effective": list(m.eprop_defs(t.name))} for t in m.etypes.values()]
+               "effective": list(m.eprop_defs(t.name)), "description": t.description} for t in m.etypes.values()]
     covered = [n for n in nodes if n.level() >= min_lv]
     return {
         "entry": m.entry,
@@ -170,28 +181,23 @@ def snapshot(m):
     }
 
 
+def impact_json(m, e):
+    """sem.impact as JSON (see Impact in web/src/types.ts)."""
+    i = sem.impact(m, e)
+    return {"provides": [{"target": sem.cid(n), "others": [sem.eid(x) for x in others]} for n, others in i["provides"]],
+            "white": [sem.cid(n) for n in i["white"]],
+            "unmet": [{"entity": sem.eid(x), "verb": rt.name, "target": sem.cid(r["target"]),
+                       "dependency": r["attrs"].get("dependency", "hard")} for x, r, rt in i["unmet"]],
+            "dependents": [{"relation": rt.name, "inverse": rt.inverse, "affected": [{"id": x, "hops": d} for x, d in out]}
+                           for rt, out in i["dependents"]],
+            "referenced": [{"from": sem.nid(x), "prop": p.name} for x, p in i["referenced"]]}
+
+
 def impact(m, name):
     e = m.entity(name)
     if e is None:
         raise ValueError(f"no entity '{name}'")
-    before = {(x.name, r["target"].path(), r["verb"]) for x, r, _ in sem.unmet(m)}
-    lost = [sem.cid(n) for n in m.all_nodes() if sem.providers(m, n) and not sem.providers(m, n, {e.name})]
-    new = [{"entity": sem.eid(x), "verb": rt.name, "target": sem.cid(r["target"]), "dependency": r["attrs"].get("dependency", "hard")}
-           for x, r, rt in sem.unmet(m, {e.name}) if (x.name, r["target"].path(), r["verb"]) not in before]
-    adj, chains = sem.adjacency(m), []
-    for rt in m.rtypes.values():
-        if rt.transitive and rt.inverse:
-            seen, queue, out = {sem.eid(e)}, collections.deque([(sem.eid(e), 0)]), []
-            while queue:
-                cur, d = queue.popleft()
-                for lab, other, _ in adj[cur]:
-                    if lab == rt.inverse and other not in seen:
-                        seen.add(other)
-                        queue.append((other, d + 1))
-                        out.append({"id": other, "hops": d + 1})
-            if out:
-                chains.append({"relation": rt.name, "affected": out})
-    return {"entity": sem.eid(e), "lostCapabilities": lost, "newUnmet": new, "transitive": chains}
+    return {"entity": sem.eid(e), **impact_json(m, e)}
 
 
 # ------------------------------------------------------------------ http
@@ -249,6 +255,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"path": rel(p), "content": open(p, encoding="utf-8").read()})
         elif url == "/api/impact":
             self.send(200, impact(load(), q.get("entity", "")))
+        elif url == "/api/locate":
+            m = load()
+            self.send(200, {"query": q.get("id", ""), "matches": [
+                {"id": sem.nid(x), "uid": x.uid, "kind": "capability" if isinstance(x, sem.Node) else "entity",
+                 "label": sem.describe(m, x), "file": x.src, "line": sem.id_line(m, x)} for x in sem.locate(m, q.get("id", ""))]})
         elif url.startswith("/api/"):
             self.send(404, {"error": "no such endpoint"})
         else:

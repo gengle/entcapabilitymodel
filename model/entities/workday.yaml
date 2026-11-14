@@ -1,0 +1,8 @@
+kind: Entity
+type: Application
+name: "Workday"
+id: 6d6d7021-bd6d-465b-931e-e4d8ed486951
+props: {}
+relations:
+  exposes:
+    - Interview Scheduling

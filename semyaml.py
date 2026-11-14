@@ -12,6 +12,12 @@ loads each matching file. Documents are added to the model; fragments are merged
 first (mappings merge, lists append, the including file wins on scalars). Each capability, entity, prop and
 relation remembers the file it came from (`src`, `prop_src`, rel["src"]) so tools can point back at it.
 Problems are collected in `m.load_errors` as "file: message" and reported by sem.validate.
+A prop (capability props, entity type props, relation attrs) is a .sem spec string, or a mapping that can document it:
+  {type: string|int|enum|ref, description, values: [a, b] | {a: meaning, b: meaning}, to: [EntityType, ...],
+   default, inherit, required, key}
+`ref` values point at an entity of a `to` type by its name, id or a `key` prop (`key: true`, e.g. a User's email);
+see Model.ref. Unresolved refs are validation warnings.
+Entity types and relation types also take `description`. These become Prop.description / Prop.docs and .description.
 """
 import copy, glob, os, re
 import yaml
@@ -21,7 +27,9 @@ KEYS = {"Model": {"include", "name", "description", "version"},
         "Capability": {"include", "name", "id", "parent", "props", "children"},
         "Entity": {"include", "type", "name", "id", "props", "relations"}}
 CHILD_KEYS = {"name", "id", "props", "children"}
-RTYPE_KEYS = {"from", "to", "attrs", "inverse", "min_level", "satisfied_by", "conflicts_with", "transitive", "no_cycles"}
+PROP_KEYS = {"type", "values", "to", "default", "inherit", "required", "key", "description"}
+ETYPE_KEYS = {"extends", "props", "description"}
+RTYPE_KEYS = {"description", "from", "to", "attrs", "inverse", "min_level", "satisfied_by", "conflicts_with", "transitive", "no_cycles"}
 
 
 def sval(v):
@@ -192,17 +200,35 @@ def load(path, S, overrides=None):
 
 
 def prop(S, name, spec):
+    """A property from its .sem syntax string, or from a mapping that can also document it:
+    {type, values, default, inherit, required, description}, where `values` is a list or a mapping of value -> meaning."""
     if isinstance(spec, str):
         return S.parse_prop(f"{name}: {spec}")
     spec = spec or {}
+    if not isinstance(spec, dict):
+        raise ValueError(f"property {name}: expected a spec string or a mapping")
+    for k in set(spec) - PROP_KEYS:
+        raise ValueError(f"property {name}: unknown setting '{k}'")
     typ = str(spec.get("type", "string"))
-    if typ not in ("string", "int", "enum"):
+    if typ not in ("string", "int", "enum", "ref"):
         raise ValueError(f"property {name}: unknown type '{typ}'")
-    vals = names(spec.get("values")) or None
+    targets = names(spec.get("to"))
+    if (typ == "ref") != bool(targets):
+        raise ValueError(f"property {name}: 'to' (the entity types it may point at) is required for ref and only allowed for ref")
+    raw = spec.get("values")
+    docs = {sval(k): (None if v is None else str(v).strip()) for k, v in raw.items()} if isinstance(raw, dict) else {}
+    vals = list(docs) if isinstance(raw, dict) else names(raw) or None
     if (typ == "enum") != bool(vals):
         raise ValueError(f"property {name}: 'values' is required for enum and only allowed for enum")
     dflt = spec.get("default")
-    return S.Prop(name, typ, vals, None if dflt is None else sval(dflt), bool(spec.get("inherit")), bool(spec.get("required")))
+    if dflt is not None and vals and sval(dflt) not in vals:
+        raise ValueError(f"property {name}: default '{sval(dflt)}' is not one of its values")
+    p = S.Prop(name, typ, vals, None if dflt is None else sval(dflt), bool(spec.get("inherit")), bool(spec.get("required")),
+               targets or None, bool(spec.get("key")))
+    if spec.get("description") is not None:
+        p.description = str(spec["description"]).strip()
+    p.docs = {k: v for k, v in docs.items() if v}
+    return p
 
 
 def props(S, f, specs, errors, where):
@@ -230,7 +256,10 @@ def schema(m, S, f, d, errors):
         spec = spec or {}
         if name in m.etypes:
             errors.append(f"{f}: entity type '{name}' is defined twice")
+        for k in set(spec) - ETYPE_KEYS:
+            errors.append(f"{f}: entity type {name}: unknown setting '{k}'")
         et = S.EType(str(name), spec.get("extends"))
+        et.description = None if spec.get("description") is None else str(spec["description"]).strip()
         et.props = props(S, f, spec.get("props"), errors, f"entity type {name}")
         m.etypes[et.name] = et
     for name, spec in (d.get("relations") or {}).items():
@@ -240,6 +269,7 @@ def schema(m, S, f, d, errors):
         for k in set(spec) - RTYPE_KEYS:
             errors.append(f"{f}: relation {name}: unknown setting '{k}'")
         rt = S.RType(str(name))
+        rt.description = None if spec.get("description") is None else str(spec["description"]).strip()
         rt.frm, rt.to = names(spec.get("from")), names(spec.get("to"))
         rt.attrs = props(S, f, spec.get("attrs"), errors, f"relation {name}")
         rt.inverse = spec.get("inverse")
@@ -303,7 +333,13 @@ def slug(s):
 
 
 def spec(p):
-    return p.line().split(":", 1)[1].strip()
+    """The .sem syntax string, or the mapping form when the property carries descriptions."""
+    if not (getattr(p, "description", None) or getattr(p, "docs", None)):
+        return p.line().split(":", 1)[1].strip()
+    return {k: v for k, v in (
+        ("type", p.type), ("description", p.description), ("to", list(p.targets) or None),
+        ("values", {x: p.docs.get(x) for x in p.enum} if p.enum else None), ("default", typed(p, p.default)),
+        ("inherit", p.inherit or None), ("required", p.required or None), ("key", getattr(p, "key", False) or None)) if v is not None}
 
 
 def typed(p, v):
@@ -325,13 +361,14 @@ def dump(m, S, outdir):
     sch = {"kind": "Schema", "root": m.root_name, "levels": dict(sorted(m.levels.items())),
            "props": {p.name: spec(p) for p in m.props.values()},
            "rules": {k: v or True for k, v in m.rules.items()},
-           "entity_types": {t.name: {**({"extends": t.parent} if t.parent else {}),
+           "entity_types": {t.name: {**({"description": t.description} if getattr(t, "description", None) else {}),
+                                     **({"extends": t.parent} if t.parent else {}),
                                      **({"props": {p.name: spec(p) for p in t.props.values()}} if t.props else {})} or None
                             for t in m.etypes.values()},
            "relations": {}}
     for r in m.rtypes.values():
         sch["relations"][r.name] = {k: v for k, v in (
-            ("from", r.frm), ("to", r.to), ("attrs", {p.name: spec(p) for p in r.attrs.values()} or None),
+            ("description", getattr(r, "description", None)), ("from", r.frm), ("to", r.to), ("attrs", {p.name: spec(p) for p in r.attrs.values()} or None),
             ("inverse", r.inverse), ("min_level", r.min_level), ("satisfied_by", r.satisfied_by or None),
             ("conflicts_with", r.conflicts or None), ("transitive", r.transitive or None), ("no_cycles", r.no_cycles or None)) if v is not None}
     out.append(write(os.path.join(outdir, "schema.yaml"), sch))

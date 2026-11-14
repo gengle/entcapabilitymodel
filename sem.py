@@ -7,7 +7,7 @@ EDIT       add "L1/L2/L3" [k=v ..] [-p] | set <capability> k=v ..
            link <Entity> <relation> <target> [k=v ..]   (expose / require are shortcuts) | unlink <Entity> <target>
 META       type add <Name> [Parent] | type prop <Type> "key: type [= default]"
            relation add <name> <from|from> <to|to> [inverse=x] [transitive] [no_cycles]
-NAVIGATE   neighbors <ref> | closure <ref> <relation> | path <A> <B> | who <ref> | gaps | coverage | impact <Entity>
+NAVIGATE   locate <id> | neighbors <ref> | closure <ref> <relation> | path <A> <B> | who <ref> | gaps | coverage | impact <Entity>
 GENERATE   gen <site|sql|typeql|jsonschema|openapi|mermaid|csv|all> <outdir> [--level N] | yaml <outdir>
 YAML       ids [--dry-run]   give every capability and entity without an `id` a new UUID (written into its file)
            version [major|minor|patch|<x.y.z>]   show the model version, bump it, or set it (model.yaml)
@@ -18,7 +18,7 @@ here: EDIT and META commands refuse it, edit its files (or use server.py). `yaml
 import collections, json, os, re, sys
 
 MODEL = os.environ.get("SEM_MODEL") or ("model" if os.path.isdir("model") else "model.sem")
-PROP_RE = re.compile(r'^(\w+):\s*(\w+)(?:\(([^)]*)\))?(?:\s*=\s*("[^"]*"|\S+))?((?:\s+(?:inherit|required))*)\s*$')
+PROP_RE = re.compile(r'^(\w+):\s*(\w+)(?:\(([^)]*)\))?(?:\s*=\s*("[^"]*"|\S+))?((?:\s+(?:inherit|required|key))*)\s*$')
 REL_RE = re.compile(r'^(\w+)\s+(.+?)(?:\s*\[([^\]]*)\])?\s*$')
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
@@ -34,14 +34,19 @@ def fmt(v):
 
 
 class Prop:
-    def __init__(self, name, typ, enum, default, inherit=False, required=False):
+    def __init__(self, name, typ, enum, default, inherit=False, required=False, targets=None, key=False):
         self.name, self.type, self.enum, self.default = name, typ, enum, default
         self.inherit, self.required = inherit, required
+        self.targets = targets or []  # type ref: the entity types a value may point at (ref(User,Team))
+        self.key = key                # the value identifies its entity, so a ref may use it (e.g. a User's email)
+        self.description = None  # what the field means (YAML mapping form only; the .sem syntax has no room for it)
+        self.docs = {}           # enum value -> what that value means
 
     def line(self):
-        t = self.type + (f"({','.join(self.enum)})" if self.enum else "")
+        args = self.enum or (self.targets if self.type == "ref" else None)
+        t = self.type + (f"({','.join(args)})" if args else "")
         return (f"{self.name}: {t}" + (f" = {fmt(self.default)}" if self.default is not None else "")
-                + (" inherit" if self.inherit else "") + (" required" if self.required else ""))
+                + (" inherit" if self.inherit else "") + (" required" if self.required else "") + (" key" if self.key else ""))
 
     def coerce(self, raw):
         if self.type == "int":
@@ -59,8 +64,11 @@ def parse_prop(rest, ln=0):
     if not g:
         raise ValueError(f"line {ln}: bad property '{rest}'")
     name, typ, enum, default, flags = g.groups()
-    return Prop(name, typ, enum.split(",") if enum else None, unq(default) if default else None,
-                "inherit" in flags, "required" in flags)
+    args = [x.strip() for x in enum.split(",")] if enum else None
+    if typ == "ref" and not args:
+        raise ValueError(f"line {ln}: property {name}: ref needs the entity types it may point at, e.g. ref(User,Team)")
+    return Prop(name, typ, None if typ == "ref" else args, unq(default) if default else None,
+                "inherit" in flags, "required" in flags, args if typ == "ref" else None, "key" in flags)
 
 
 class Node:
@@ -93,6 +101,7 @@ class Entity:
 class EType:
     def __init__(self, name, parent=None):
         self.name, self.parent, self.props = name, parent, {}
+        self.description = None
 
 
 class RType:
@@ -100,6 +109,7 @@ class RType:
         self.name, self.frm, self.to, self.attrs, self.inverse = name, [], [], {}, None
         self.min_level, self.satisfied_by, self.conflicts = None, [], []
         self.transitive = self.no_cycles = False
+        self.description = None
 
 
 class Model:
@@ -176,6 +186,26 @@ class Model:
 
     def conforms(self, t, names):
         return "*" in names or any(x in names for x in self.chain(t))
+
+    def ref(self, p, value):
+        """The entity a ref prop's value points at: an entity of one of p.targets whose name, id or a `key` prop
+        (e.g. a User's email) equals the value, ignoring case. None when it matches nothing (or p is not a ref)."""
+        if value is None or p is None or p.type != "ref":
+            return None
+        v = str(value).strip().lower()
+        for e in self.entities:
+            if not self.conforms(e.type, p.targets):
+                continue
+            if e.name.lower() == v or (e.uid or "").lower() == v:
+                return e
+            if any(d.key and str(e.local.get(k, "")).lower() == v for k, d in self.eprop_defs(e.type).items()):
+                return e
+        return None
+
+    def ref_keys(self, p):
+        """How a ref prop's value may name its entity, for messages: name, id and the targets' key props."""
+        keys = {k for t in self.etypes if self.conforms(t, p.targets) for k, d in self.eprop_defs(t).items() if d.key}
+        return ", ".join(["name", "id", *sorted(keys)])
 
     def link(self):
         for e in self.entities:
@@ -400,6 +430,25 @@ def edges(m):
             rt = m.rtypes.get(r["verb"])
             if r["target"] is not None and rt:
                 out.append((eid(e), rt.name, nid(r["target"]), r["attrs"], rt.inverse or f"~{rt.name}"))
+    for src, p, t in refs(m):
+        out.append((nid(src), p.name, eid(t), {}, f"{p.name}_of"))
+    return out
+
+
+def refs(m):
+    """(capability or entity, prop, target entity) for every ref prop value set locally that resolves."""
+    out = []
+    for n in m.all_nodes():
+        for k, v in n.local.items():
+            t = m.ref(m.props.get(k), v)
+            if t:
+                out.append((n, m.props[k], t))
+    for e in m.entities:
+        defs = m.eprop_defs(e.type) if e.type in m.etypes else {}
+        for k, v in e.local.items():
+            t = m.ref(defs.get(k), v)
+            if t:
+                out.append((e, defs[k], t))
     return out
 
 
@@ -411,6 +460,10 @@ def adjacency(m):
     return adj
 
 
+def unresolved(m, where, p, v):
+    return f"{where}: {p.name} '{v}' is not a known {' or '.join(p.targets)} (match by {m.ref_keys(p)})"
+
+
 def validate(m):
     errs, warns = list(getattr(m, "load_errors", [])), []
     limit = m.depth_limit()
@@ -420,6 +473,18 @@ def validate(m):
         elif len(m.chain(t.name)) != len({*m.chain(t.name)}) or (t.parent and t.name in m.chain(t.parent)):
             errs.append(f"entity_type {t.name}: inheritance cycle")
     known = set(m.etypes) | {"Capability", "*"}
+    scopes = [(m.root_name, m.props)] + [(f"entity_type {t.name}", t.props) for t in m.etypes.values()]         + [(f"relation {r.name}", r.attrs) for r in m.rtypes.values()]
+    for where, props in scopes:
+        for p in props.values():
+            for x in p.targets:
+                if x not in m.etypes and x != "*":
+                    errs.append(f"{where}: {p.name}: ref to unknown entity type '{x}'")
+    for t in m.etypes.values():  # a key prop identifies one entity, so its values must be unique
+        for k, p in t.props.items():
+            if p.key:
+                vals = [str(e.local[k]).lower() for e in m.entities if k in e.local and m.conforms(e.type, [t.name])]
+                for d in sorted({v for v in vals if vals.count(v) > 1}):
+                    errs.append(f"entity_type {t.name}: key '{k}' value '{d}' is used by more than one entity")
     invs = {}
     for rt in m.rtypes.values():
         for side, names in (("from", rt.frm), ("to", rt.to)):
@@ -446,6 +511,8 @@ def validate(m):
         for k in n.local:
             if k not in m.props:
                 errs.append(f"{where}: unknown property '{k}' (not defined on root {m.root_name})")
+            elif m.props[k].type == "ref" and m.ref(m.props[k], n.local[k]) is None:
+                warns.append(unresolved(m, where, m.props[k], n.local[k]))
         for p in m.props.values():
             try:
                 v, _ = m.resolve(n, p)
@@ -483,6 +550,8 @@ def validate(m):
                     defs[k].coerce(v)
                 except ValueError as x:
                     errs.append(f"{w}: {x}")
+                if defs[k].type == "ref" and m.ref(defs[k], v) is None:
+                    warns.append(unresolved(m, w, defs[k], v))
         for p in defs.values():
             if p.required and e.local.get(p.name, p.default) is None:
                 errs.append(f"{w}: required '{p.name}' is unset")
@@ -614,12 +683,63 @@ def cmd_ids(rest):
 
 
 # ------------------------------------------------------------------ commands
+def norm_uid(s):
+    return re.sub(r"[^0-9a-f]", "", str(s).lower())
+
+
+def locate(m, text):
+    """Capabilities and entities whose id is `text`, or starts with it (at least 4 hex digits; case, hyphens and
+    braces are ignored, so the short "d54cfb4b" the viewer shows works). Exact matches win over prefix matches."""
+    t = str(text).strip().lower().strip("{}")
+    q = norm_uid(t)
+    if len(q) < 4 or not re.fullmatch(r"[0-9a-f-]+", t):
+        return []
+    objs = [x for x in [*m.all_nodes(), *m.entities] if getattr(x, "uid", None)]
+    return [x for x in objs if norm_uid(x.uid) == q] or [x for x in objs if norm_uid(x.uid).startswith(q)]
+
+
+def id_line(m, x):
+    """1-based line of x's `id:` in its source file (YAML models), or None."""
+    root, src = getattr(m, "src_root", None), getattr(x, "src", None)
+    if not (root and src and x.uid):
+        return None
+    try:
+        with open(os.path.join(root, src), encoding="utf-8") as fh:
+            for i, line in enumerate(fh, 1):
+                if x.uid.lower() in line.lower():
+                    return i
+    except OSError:
+        pass
+    return None
+
+
+def describe(m, x):
+    return (f"capability L{x.level()} {x.path()}" if isinstance(x, Node) else f"entity ({x.type}) {x.name}")
+
+
+def cmd_locate(m, text):
+    hits = locate(m, text)
+    if not hits:
+        sys.exit(f"no capability or entity has an id matching '{text}' (give the full id or at least 4 hex digits)")
+    if len(hits) > 1:
+        print(f"{len(hits)} objects have ids starting with '{text}'; give more digits:")
+    for x in hits:
+        line = id_line(m, x)
+        print(describe(m, x))
+        print(f"  {x.src}{f':{line}' if line else ''}   id {x.uid}")
+
+
 def ref(m, text):
     e, (n, err) = m.entity(text), m.find_cap(text)
     if e and n:
         sys.exit(f"'{text}' is both an entity and a capability; use the full capability path")
     if e or n:
         return e or n
+    hits = locate(m, text)  # a unique id prefix also works
+    if len(hits) == 1:
+        return hits[0]
+    if len(hits) > 1:
+        sys.exit(f"'{text}' is the start of {len(hits)} ids; give more digits")
     sys.exit(f"no entity or capability '{text}'" if "ambiguous" not in (err or "") else err)
 
 
@@ -649,14 +769,28 @@ def cmd_tree(m):
         go(c, 0)
 
 
+def print_docs(props, ind):
+    """Descriptions of props and their enum values, indented under the line that lists them."""
+    for p in props.values():
+        if p.description:
+            print(f"{ind}{p.name}: {p.description}")
+        for v in p.enum or []:
+            if v in p.docs:
+                print(f"{ind}  {p.name}={v}: {p.docs[v]}")
+
+
 def cmd_schema(m):
     print(f"capability levels: " + " > ".join(f"L{k} {v}" for k, v in sorted(m.levels.items())))
     print(f"capability properties: " + ", ".join(p.line() for p in m.props.values()))
+    print_docs(m.props, "    ")
     print("\nentity types")
     for t in m.etypes.values():
         print(f"  {t.name}" + (f" : {t.parent}" if t.parent else "") + "   own props: " + (", ".join(p.line() for p in t.props.values()) or "-"))
+        if t.description:
+            print(f"      {t.description}")
         if t.parent:
             print("      effective: " + ", ".join(m.eprop_defs(t.name)))
+        print_docs(t.props, "      ")
     print("\nrelation types")
     for r in m.rtypes.values():
         flags = [x for x in (("transitive" if r.transitive else ""), ("no_cycles" if r.no_cycles else ""),
@@ -665,6 +799,9 @@ def cmd_schema(m):
                              (f"conflicts_with {','.join(r.conflicts)}" if r.conflicts else "")) if x]
         print(f"  {r.name}: {'|'.join(r.frm)} -> {'|'.join(r.to)}   inverse {r.inverse or '-'}   attrs: "
               + (", ".join(p.line() for p in r.attrs.values()) or "-") + (f"   [{'; '.join(flags)}]" if flags else ""))
+        if r.description:
+            print(f"      {r.description}")
+        print_docs(r.attrs, "      ")
 
 
 def cmd_show(m, x):
@@ -780,17 +917,23 @@ def cmd_coverage(m):
     print(f"{len(nodes) - white}/{len(nodes)} covered, {white} white space")
 
 
-def cmd_impact(m, e):
+def impact(m, e):
+    """What retiring (or removing) entity e would change, as plain data shared by the CLI and the server.
+
+    provides   [(capability, [other providers])] for each capability e directly provides (a satisfied_by verb)
+    white      capabilities at or above the coverage level that would be left with no provider at all
+    unmet      [(entity, rel, rtype)] requirements met today that would become unmet
+    dependents [(relation, [(entity id, hops)])] entities reaching e through the inverse of a transitive relation
+    referenced [(capability or entity, prop)] ref props that name e (e.g. what it owns or heads)
+    """
+    verbs, min_lv = provide_verbs(m), provide_min_level(m)
+    gone = {e.name}
+    provides = [(r["target"], [x for x in providers(m, r["target"], gone)])
+                for r in e.rels if r["verb"] in verbs and isinstance(r["target"], Node)]
+    white = [n for n in m.all_nodes() if n.level() >= min_lv and providers(m, n) and not providers(m, n, gone)]
     before = {(x.name, r["target"].path(), r["verb"]) for x, r, _ in unmet(m)}
-    after = unmet(m, {e.name})
-    lost = [n for n in m.all_nodes() if providers(m, n) and not providers(m, n, {e.name})]
-    print(f"impact of retiring/removing {e.name} ({e.type})")
-    print("  capabilities left with no provider: " + (", ".join(n.path() for n in lost) or "none"))
-    new = [(x, r, rt) for x, r, rt in after if (x.name, r["target"].path(), r["verb"]) not in before]
-    print("  requirements that become unmet:" + ("" if new else " none"))
-    for x, r, rt in new:
-        print(f"    - {x.name} {rt.name} {r['target'].path()} ({r['attrs'].get('dependency', 'hard')})")
-    adj = adjacency(m)
+    new = [(x, r, rt) for x, r, rt in unmet(m, gone) if (x.name, r["target"].path(), r["verb"]) not in before]
+    adj, dependents = adjacency(m), []
     for rt in m.rtypes.values():
         if rt.transitive and rt.inverse:
             seen, queue, out = {eid(e)}, collections.deque([(eid(e), 0)]), []
@@ -800,15 +943,49 @@ def cmd_impact(m, e):
                     if lab == rt.inverse and other not in seen:
                         seen.add(other)
                         queue.append((other, d + 1))
-                        out.append((disp(other), d + 1))
+                        out.append((other, d + 1))
             if out:
-                print(f"  affected via {rt.name} (transitive): " + ", ".join(f"{n}{'' if d == 1 else f' (via {d} hops)'}" for n, d in out))
-    if any(r["verb"] in {x for rt in m.rtypes.values() for x in rt.satisfied_by} is False for r in e.rels):
-        pass
+                dependents.append((rt, out))
+    referenced = [(x, p) for x, p, t in refs(m) if t is e]
+    return {"provides": provides, "white": white, "unmet": new, "dependents": dependents, "referenced": referenced}
+
+
+def cmd_impact(m, e):
+    i = impact(m, e)
+    hard = [u for u in i["unmet"] if u[1]["attrs"].get("dependency", "hard") == "hard"]
+    print(f"retirement impact of {e.name} ({e.type})" + ("  [already retired: it no longer counts as a provider]" if retired(e) else ""))
+    if not (i["white"] or i["unmet"] or i["dependents"] or i["referenced"]):
+        print("  safe to retire: nothing relies on it")
+    else:
+        print(f"  {len(i['white'])} capability(ies) left without a provider, {len(hard)} hard / "
+              f"{len(i['unmet']) - len(hard)} soft requirement(s) unmet, "
+              f"{sum(len(a) for _, a in i['dependents'])} dependent(s), {len(i['referenced'])} reference(s)")
+    for n, others in i["provides"]:
+        print(f"  provides {n.path()}: " + (f"also provided by {', '.join(x.name for x in others)}" if others else "sole provider"))
+    for n in i["white"]:
+        print(f"  white space: {n.path()}")
+    for x, r, rt in i["unmet"]:
+        print(f"  unmet: {x.name} {rt.name} {r['target'].path()} ({r['attrs'].get('dependency', 'hard')})")
+    for rt, out in i["dependents"]:
+        print(f"  {rt.inverse} (via {rt.name}): " + ", ".join(f"{disp(x)}{'' if d == 1 else f' ({d} hops)'}" for x, d in out))
+    for x, p in i["referenced"]:
+        print(f"  {p.name} of {disp(nid(x))}")
 
 
 def flatten(m):
-    out = {}
+    out = {"capability props": {"props": [p.line() for p in m.props.values()]}}
+
+    def docs(scope, desc, props):
+        if desc:
+            out[f"description {scope}"] = {"text": desc}
+        for p in props.values():
+            if p.description or p.docs:
+                out[f"description {scope}.{p.name}"] = {**({"text": p.description} if p.description else {}), **p.docs}
+    docs("capability", None, m.props)
+    for t in m.etypes.values():
+        docs(f"entity_type {t.name}", t.description, t.props)
+    for r in m.rtypes.values():
+        docs(f"relation_type {r.name}", r.description, r.attrs)
     for t in m.etypes.values():
         out[f"entity_type {t.name}"] = {"parent": t.parent, "props": [p.line() for p in t.props.values()]}
     for r in m.rtypes.values():
@@ -899,6 +1076,8 @@ def main():
         cmd_gaps(m)
     elif cmd == "coverage":
         cmd_coverage(m)
+    elif cmd == "locate" and rest:
+        cmd_locate(m, rest[0])
     elif cmd == "impact" and rest:
         cmd_impact(m, need(m, rest[0], "ent"))
     elif cmd == "validate":

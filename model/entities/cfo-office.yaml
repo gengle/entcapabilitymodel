@@ -1,0 +1,6 @@
+kind: Entity
+type: Team
+name: "CFO Office"
+id: c4dd3634-36a7-4f86-b8ee-cbbc17a46f92
+props: {}
+relations: {}

@@ -42,6 +42,7 @@ export const CONTROL_LABEL: Record<Control, string> = {
 export function controlsFor(def: PropDef): Control[] {
   if (def.enum) return ["select", "radio"];
   if (def.type === "int") return ["number", "slider", "select", "radio"];
+  if (def.type === "ref") return ["combo", "text"];
   return ["text", "textarea", "combo", "select", "radio"];
 }
 
@@ -51,7 +52,7 @@ export const HEADER = `# Form controls used by the viewer's edit forms. The Form
 # It is not part of the model (nothing includes it), so it never changes validation.
 #   capability: <prop>   entity: <prop>   relation: <verb>.<attr>
 #   control: text | textarea | combo | number | slider | select | radio
-#   Defaults: enum -> select, int -> number, string -> text.
+#   Defaults: enum -> select, int -> number, ref -> combo (entity names), string -> text.
 #   select / radio / combo on a non-enum field take options: [...]; slider takes min, max and step.
 `;
 
@@ -91,7 +92,7 @@ export function lookup(cfg: UiConfig, scope: Scope, key: string): FieldUi {
 
 export function resolveUi(cfg: UiConfig, scope: Scope, key: string, def: PropDef): Resolved {
   const u = lookup(cfg, scope, key);
-  const base: Control = def.enum ? "select" : def.type === "int" ? "number" : "text";
+  const base: Control = def.enum ? "select" : def.type === "int" ? "number" : def.type === "ref" ? "combo" : "text";
   let control = u.control && controlsFor(def).includes(u.control) ? u.control : base;
   const options = def.enum ?? u.options ?? [];
   if (needsOptions(control) && !options.length) control = base;

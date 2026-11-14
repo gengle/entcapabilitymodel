@@ -3,7 +3,7 @@ parent: Finance
 name: Accounts Payable
 id: d720a76b-d38b-48c9-a98a-dc48c9ddade0
 props:
-  owner: Dana Reyes
+  owner: Greg Engle
 children:
   - name: Invoice Management
     id: c1de3205-3aa1-4170-9903-5f8999b4c276

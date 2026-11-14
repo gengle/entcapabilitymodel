@@ -8,6 +8,10 @@ export interface PropDef {
   inherit: boolean;
   required: boolean;
   spec: string;
+  description: string | null; // what the field means (schema `description`)
+  valueDocs: Record<string, string>; // enum value -> what it means (schema `values` mapping)
+  to: string[] | null; // type ref: the entity types a value may point at
+  key: boolean; // the value identifies its entity, so a ref may use it (e.g. a User's email)
 }
 
 export interface PropVal {
@@ -15,6 +19,7 @@ export interface PropVal {
   value: string | null;
   origin: string; // capabilities: local | inherited from <path> | root default | unset; entities: local | default | unset | unknown
   src: string | null;
+  ref: string | null; // type ref: the entity ("ent:<name>") the value points at, null when it matches none
 }
 
 export interface Incoming {
@@ -65,6 +70,7 @@ export interface Ent {
   props: PropVal[];
   relations: Rel[];
   incoming: Incoming[];
+  impact: Impact; // what retiring this entity would change (sem.impact); computed per snapshot, so drafts count
 }
 
 export interface FileInfo {
@@ -96,6 +102,7 @@ export interface EntityType {
   chain: string[];
   props: PropDef[];
   effective: string[];
+  description: string | null;
 }
 
 export interface RelationType {
@@ -109,6 +116,7 @@ export interface RelationType {
   conflictsWith: string[];
   transitive: boolean;
   noCycles: boolean;
+  description: string | null;
 }
 
 export interface Snapshot {
@@ -132,8 +140,9 @@ export interface Snapshot {
 }
 
 export interface Impact {
-  entity: string;
-  lostCapabilities: string[];
-  newUnmet: { entity: string; verb: string; target: string; dependency: string }[];
-  transitive: { relation: string; affected: { id: string; hops: number }[] }[];
+  provides: { target: string; others: string[] }[]; // capabilities it provides directly, with the providers left
+  white: string[]; // capabilities (at or above the coverage level) left with no provider
+  unmet: { entity: string; verb: string; target: string; dependency: string }[]; // requirements that would become unmet
+  dependents: { relation: string; inverse: string | null; affected: { id: string; hops: number }[] }[];
+  referenced: { from: string; prop: string }[]; // ref props that name this entity (what it owns, heads, ...)
 }

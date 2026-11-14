@@ -1,18 +1,64 @@
 # Entity types with is-a inheritance (extends). Props are written as "type [= default] [inherit] [required]"
-# or as a mapping: {type: enum, values: [a, b], default: a, required: true}.
+# or as a mapping that can also document them:
+#   {type, description, values: [a, b] or {a: meaning, b: meaning}, to: [Type, ...], default, inherit, required, key}
+# type ref points at an entity of a `to` type by its name, id or a key prop; key: true makes a prop such a key.
 kind: Schema
 entity_types:
   Asset:
+    description: Anything the business runs or owns that can provide or need capabilities.
     props:
-      owner: string
-      lifecycle: enum(plan,active,retire) = active
+      owner:
+        type: ref
+        to: [User, Team]
+        description: Team or person accountable for running the asset. Name a User or Team by its name, id or (for a User) email.
+      lifecycle:
+        type: enum
+        description: Where the asset is in its life.
+        values:
+          plan: Planned or being built; it doesn't provide anything yet.
+          active: In service.
+          retire: Being decommissioned. It no longer counts as a provider of capabilities.
+        default: active
   Application:
     extends: Asset
+    description: A software product, bought or built.
     props:
-      vendor: string
+      vendor:
+        type: string
+        description: Supplier of the product, or "internal" for software built in-house.
   Service:
     extends: Asset
+    description: A shared technical service that other systems rely on.
   Team:
+    description: A group of people that delivers or needs capabilities.
     props:
-      head: string
-      lifecycle: enum(plan,active,retire) = active
+      head:
+        type: ref
+        to: [User]
+        description: Person who leads the team. Name a User by its name, id or email.
+      lifecycle:
+        type: enum
+        description: Whether the team exists yet, is working, or is being wound down.
+        values:
+          plan: Being formed.
+          active: Working.
+          retire: Being wound down. It no longer counts as a provider of capabilities.
+        default: active
+  User:
+    description: A person with an identity in the organisation's systems.
+    props:
+      email:
+        type: string
+        description: >-
+          Primary email address, used as the person's sign-in and contact address.
+          It is a key: unique across users, and a reference to a User may use it instead of the name.
+        required: true
+        key: true
+      lifecycle:
+        type: enum
+        description: Where the person's account is in its life.
+        values:
+          plan: Being onboarded; the account is not in use yet.
+          active: Account in use.
+          retire: Offboarded; the account is disabled.
+        default: active

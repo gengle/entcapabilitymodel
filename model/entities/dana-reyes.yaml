@@ -1,0 +1,8 @@
+kind: Entity
+type: User
+name: "Dana Reyes"
+id: 56afb6f6-a066-4f80-9e64-0be1a9ef4563
+props:
+  email: dana@reyes.com
+  lifecycle: active
+relations: {}

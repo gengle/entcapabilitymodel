@@ -8,3 +8,4 @@ relations:
   exposes:
     - Single Sign-On
     - Candidate Sourcing
+    - Test Yogo

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Field } from "./Field";
+import { AppliedValue, definingType, entityDefs, FieldName, HelpCard, helpText, refChoices, useOpenHelp } from "./help";
 import { fileHref, groupBy, href, label, useModel, uuid } from "./model";
 import type { Cap, Ent, PropDef, PropVal, RelationType, Snapshot } from "./types";
 import { CONTROL_LABEL, controlsFor, lookup, needsOptions, resolveUi, setFieldUi, type Control, type FieldUi, type Scope, type UiConfig } from "./ui";
@@ -72,7 +73,8 @@ function NameField({ value, onCommit, title }: { value: string; onCommit: (v: st
 }
 
 function FormBar({ path }: { path: string }) {
-  const { dirty, save } = useModel();
+  const { dirty, save, revert, setFormMode } = useModel();
+  const changed = dirty.has(path);
   return (
     <div className="form-bar">
       <span className="muted small">
@@ -80,7 +82,16 @@ function FormBar({ path }: { path: string }) {
         <a href="#/forms">Choose controls…</a>
       </span>
       <span className="grow" />
-      <button className="primary" disabled={!dirty.has(path)} onClick={save} title="Ctrl+S">
+      <button
+        title={changed ? `Discard the unsaved changes to ${path} and stop editing` : "Stop editing"}
+        onClick={() => {
+          if (changed) revert(path);
+          setFormMode(false);
+        }}
+      >
+        Cancel
+      </button>
+      <button className="primary" disabled={!changed} onClick={save} title="Ctrl+S">
         Save
       </button>
     </div>
@@ -88,13 +99,6 @@ function FormBar({ path }: { path: string }) {
 }
 
 // ---------------------------------------------------------------- entity
-function entityDefs(snap: Snapshot, ent: Ent): Map<string, PropDef> {
-  const types = new Map(snap.schema.entityTypes.map((t) => [t.name, t]));
-  const out = new Map<string, PropDef>();
-  for (const t of ent.chain) for (const p of types.get(t)?.props ?? []) if (!out.has(p.name)) out.set(p.name, p);
-  return out;
-}
-
 const conforms = (chain: string[], names: string[]) => names.includes("*") || chain.some((t) => names.includes(t));
 
 /** Targets a relation type allows, as [id, label] pairs (capabilities by path, entities by name). */
@@ -112,7 +116,7 @@ function targetOptions(snap: Snapshot, rt: RelationType, self: string): { caps: 
 }
 
 /** What to write for a target: an entity's name, a capability's name when unique, else its path. */
-function targetText(snap: Snapshot, id: string): string {
+export function targetText(snap: Snapshot, id: string): string {
   if (id.startsWith("ent:")) return id.slice(4);
   const name = label(id).toLowerCase();
   let hits = 0;
@@ -158,8 +162,9 @@ function TargetSelect({ rt, value, self, onPick, placeholder }: { rt: RelationTy
 
 export function EntityForm({ ent }: { ent: Ent }) {
   const { snap, ui, mutate } = useModel();
+  const help = useOpenHelp();
   const path = ent.src;
-  const defs = entityDefs(snap, ent);
+  const defs = entityDefs(snap, ent.chain);
   const rtypes = new Map(snap.schema.relationTypes.map((r) => [r.name, r]));
   const verbs = snap.schema.relationTypes.filter((r) => conforms(ent.chain, r.from));
   const [newVerb, setNewVerb] = useState("");
@@ -196,7 +201,7 @@ export function EntityForm({ ent }: { ent: Ent }) {
                 <select aria-label="Entity type" value={ent.type} onChange={(e) => mutate(path, (d) => setScalar(d, root(d), "type", e.target.value))}>
                   {!snap.schema.entityTypes.some((t) => t.name === ent.type) && <option value={ent.type}>{ent.type} (unknown)</option>}
                   {snap.schema.entityTypes.map((t) => (
-                    <option key={t.name} value={t.name}>
+                    <option key={t.name} value={t.name} title={t.description ?? undefined}>
                       {t.name}
                       {t.parent ? ` (is-a ${t.parent})` : ""}
                     </option>
@@ -230,25 +235,35 @@ export function EntityForm({ ent }: { ent: Ent }) {
                 </tr>
               );
             return (
-              <tr key={p.name}>
-                <th title={def.spec}>
-                  {p.name}
-                  {def.required && <span className="req">*</span>}
+              <Fragment key={p.name}>
+              <tr>
+                <th>
+                  <FieldName name={p.name} def={def} required={def.required} open={help.isOpen(p.name)} onToggle={() => help.toggle(p.name)} />
                 </th>
                 <td>
                   <Field
                     label={p.name}
+                    docs={def.valueDocs}
                     ui={resolveUi(ui, "entity", p.name, def)}
                     value={local ? p.value : null}
                     fallback={def.default}
                     emptyLabel={emptyLabel(undefined, def)}
                     clearable={!fromFragment}
-                    suggestions={seen(snap, "entity", p.name)}
+                    suggestions={def.type === "ref" ? refChoices(snap, def) : seen(snap, "entity", p.name)}
                     onCommit={(v) => mutate(path, (d) => setProp(d, root(d), p.name, v === null ? null : typed(def.type, v)))}
                   />
                   {fromFragment && <Via src={p.src!} />}
+                  <AppliedValue def={def} value={p.value} origin={p.origin} type={definingType(snap, ent.chain, p.name)} refId={p.ref} />
                 </td>
               </tr>
+              {help.isOpen(p.name) && (
+                <tr className="help-row">
+                  <td colSpan={2}>
+                    <HelpCard def={def} current={p.value} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>
@@ -259,7 +274,7 @@ export function EntityForm({ ent }: { ent: Ent }) {
         const rt = rtypes.get(v);
         return (
           <div key={v} className="rel-edit">
-            <div className="rel-verb mono">
+            <div className="rel-verb mono" title={rt?.description ?? undefined}>
               {v}
               {rt?.inverse && <span className="muted"> (inverse {rt.inverse})</span>}
             </div>
@@ -276,10 +291,13 @@ export function EntityForm({ ent }: { ent: Ent }) {
                 )}
                 {rt?.attrs.map((a) => (
                   <span key={a.name} className="rel-attr">
-                    <span className="muted small">{a.name}</span>
+                    <span className="muted small help-hint" title={helpText(a)}>
+                      {a.name}
+                    </span>
                     {own ? (
                       <Field
                         label={`${v} ${a.name}`}
+                        docs={a.valueDocs}
                         ui={resolveUi(ui, "relation", `${v}.${a.name}`, a)}
                         value={r.attrs[a.name] ?? null}
                         fallback={a.default}
@@ -287,7 +305,9 @@ export function EntityForm({ ent }: { ent: Ent }) {
                         onCommit={(x) => mutate(path, (d) => setRelAttr(d, v, i, a.name, x === null || x === a.default ? null : typed(a.type, x)))}
                       />
                     ) : (
-                      <span className="attr">{r.attrs[a.name] ?? a.default ?? "—"}</span>
+                      <span className="attr" title={a.valueDocs[r.attrs[a.name] ?? a.default ?? ""]}>
+                        {r.attrs[a.name] ?? a.default ?? "—"}
+                      </span>
                     )}
                   </span>
                 ))}
@@ -309,7 +329,7 @@ export function EntityForm({ ent }: { ent: Ent }) {
           <span className="muted small">Add</span>
           <select aria-label="Relation" value={verb} onChange={(e) => setNewVerb(e.target.value)}>
             {verbs.map((r) => (
-              <option key={r.name} value={r.name}>
+              <option key={r.name} value={r.name} title={r.description ?? undefined}>
                 {r.name}
               </option>
             ))}
@@ -334,6 +354,7 @@ export function EntityForm({ ent }: { ent: Ent }) {
 // ---------------------------------------------------------------- capability
 export function CapabilityForm({ cap }: { cap: Cap }) {
   const { snap, ui, mutate } = useModel();
+  const help = useOpenHelp();
   const path = cap.src;
   const [child, setChild] = useState("");
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -370,25 +391,35 @@ export function CapabilityForm({ cap }: { cap: Cap }) {
             const local = p.origin === "local";
             const fromFragment = local && !!p.src && p.src !== path;
             return (
-              <tr key={p.name}>
-                <th title={def.spec}>
-                  {p.name}
-                  {def.required && <span className="req">*</span>}
+              <Fragment key={p.name}>
+              <tr>
+                <th>
+                  <FieldName name={p.name} def={def} required={def.required} open={help.isOpen(p.name)} onToggle={() => help.toggle(p.name)} />
                 </th>
                 <td>
                   <Field
                     label={p.name}
+                    docs={def.valueDocs}
                     ui={resolveUi(ui, "capability", p.name, def)}
                     value={local ? p.value : null}
                     fallback={local ? def.default : p.value}
                     emptyLabel={emptyLabel(local ? undefined : p, def)}
                     clearable={!fromFragment}
-                    suggestions={seen(snap, "capability", p.name)}
+                    suggestions={def.type === "ref" ? refChoices(snap, def) : seen(snap, "capability", p.name)}
                     onCommit={(v) => mutate(path, (d) => setProp(d, capOrThrow(d, cap.path), p.name, v === null ? null : typed(def.type, v)))}
                   />
                   {fromFragment && <Via src={p.src!} />}
+                  <AppliedValue def={def} value={p.value} origin={p.origin} refId={p.ref} />
                 </td>
               </tr>
+              {help.isOpen(p.name) && (
+                <tr className="help-row">
+                  <td colSpan={2}>
+                    <HelpCard def={def} current={p.value} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>

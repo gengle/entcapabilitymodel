@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { EditorPane, type Draft, type Rejection } from "./Editor";
-import { buildIndex, href, ModelCtx, parseHash, slug, uuid, type Route } from "./model";
+import { buildIndex, href, locateUid, ModelCtx, parseHash, slug, uuid, type Route } from "./model";
 import { Sidebar } from "./Sidebar";
 import type { Snapshot } from "./types";
 import { FormsView } from "./forms";
 import { parseUi, UI_FILE } from "./ui";
-import { CapabilityView, EntityView, FileView, Overview, SchemaView } from "./views";
+import { CapabilityView, EntityView, FileView, IdView, Overview, SchemaView } from "./views";
 import { applyEdit, type Edit } from "./yamledit";
 
 const POLL_MS = 1500;
@@ -118,6 +118,12 @@ export default function App() {
   // ---- which file the editor shows follows the route
   useEffect(() => {
     if (!idx) return;
+    if (route.k === "id") {
+      // #/id/<uuid or prefix>: go straight to the one object with that id (replace, so Back skips the id link)
+      const hits = locateUid(idx, route.uid);
+      if (hits.length === 1) location.replace(href(hits[0].id));
+      return setActive(null);
+    }
     if (route.k === "overview" || route.k === "schema" || route.k === "forms") return setActive(null);
     const p =
       route.k === "file"
@@ -138,8 +144,11 @@ export default function App() {
 
   // ---- actions
   const fail = (e: unknown, path: string, op: Rejection["op"]) => {
-    if (e instanceof ApiError && e.status === 422) setReject({ path, op, errors: e.body.errors ?? [] });
-    else setNotice((e as Error).message);
+    if (e instanceof ApiError && e.status === 422) {
+      setReject({ path, op, errors: e.body.errors ?? [] });
+      // the rejection banner lives in the editor of the open file; for any other file say it here
+      if (path !== active) setNotice(`Not saved ${path}: ${(e.body.errors ?? []).join("; ") || "it would add validation errors"}`);
+    } else setNotice((e as Error).message);
   };
 
   const applySaved = (s: Snapshot) => {
@@ -148,8 +157,7 @@ export default function App() {
     setReject(null);
   };
 
-  const save = async (force = false) => {
-    const path = active;
+  const save = async (force = false, path = active) => {
     const d = path && drafts[path];
     if (!path || !d) return;
     try {
@@ -199,6 +207,10 @@ export default function App() {
   };
 
   const edit = (path: string, patch: (d: Draft) => Draft) => setDrafts((p) => (p[path] ? { ...p, [path]: patch(p[path]) } : p));
+  const revert = (path: string) => {
+    setReject((r) => (r?.path === path ? null : r));
+    edit(path, (d) => ({ saved: d.saved, text: d.saved }));
+  };
 
   // Form edits rewrite the draft text through the yaml Document API, so they preview and save like typed edits.
   const mutate = (path: string, fn: Edit) => {
@@ -219,6 +231,23 @@ export default function App() {
       setNotice((e as Error).message);
       return false;
     }
+  };
+
+  /** mutate() for any file, loading it as a draft first when it isn't open yet. */
+  const mutateFile = async (path: string, fn: Edit) => {
+    if (!draftsRef.current[path]) {
+      try {
+        const f = await api.file(path);
+        if (!draftsRef.current[path]) {
+          draftsRef.current = { ...draftsRef.current, [path]: { saved: f.content, text: f.content } };
+          setDrafts(draftsRef.current);
+        }
+      } catch (e) {
+        setNotice((e as Error).message);
+        return false;
+      }
+    }
+    return mutate(path, fn);
   };
 
   // server actions that write files themselves (assign ids, set version): reload so open editors pick up the new text
@@ -257,6 +286,7 @@ export default function App() {
   if (route.k === "overview") main = <Overview />;
   else if (route.k === "schema") main = <SchemaView />;
   else if (route.k === "forms") main = <FormsView />;
+  else if (route.k === "id") main = <IdView uid={route.uid} hits={locateUid(idx, route.uid)} />;
   else if (route.k === "file") {
     const f = idx.files.get(route.path);
     main = f ? <FileView file={f} /> : <p className="muted pad">No YAML file {route.path}.</p>;
@@ -278,7 +308,7 @@ export default function App() {
 
   return (
     <ModelCtx.Provider
-      value={{ snap: view, idx, dirty, ui, uiText, saveUi, formMode, setFormMode, mutate, save: () => saveRef.current(), run }}
+      value={{ snap: view, idx, dirty, ui, uiText, saveUi, formMode, setFormMode, mutate, save: () => saveRef.current(), saveFile: (p: string) => saveRef.current(false, p), revert, mutateFile, run }}
     >
       <div className={`app${showEditor ? "" : " no-editor"}`}>
         <header className="top">
@@ -325,10 +355,7 @@ export default function App() {
               edit(active, (d) => ({ ...d, text }));
             }}
             onSave={save}
-            onRevert={() => {
-              setReject(null);
-              edit(active, (d) => ({ saved: d.saved, text: d.saved }));
-            }}
+            onRevert={() => revert(active)}
             onDelete={remove}
             onDismiss={() => setReject(null)}
             onTakeDisk={() =>

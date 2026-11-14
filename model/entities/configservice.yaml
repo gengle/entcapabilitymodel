@@ -2,5 +2,8 @@ kind: Entity
 type: Service
 name: "ConfigService"
 id: 0a5297cb-bb4d-43b8-aeda-e5353554b464
-props: {}
-relations: {}
+props:
+  owner: Greg Engle
+relations:
+  exposes:
+    - Onboarding

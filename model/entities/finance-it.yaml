@@ -1,0 +1,6 @@
+kind: Entity
+type: Team
+name: "Finance IT"
+id: 40cc136c-7d11-47ef-a3a0-4ca3e151c3a1
+props: {}
+relations: {}

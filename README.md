@@ -15,7 +15,11 @@ Every file is a mapping. A file with `kind` is a document; a file without one is
 
 `include:` takes a path or a list (globs allowed), relative to the file. Included documents join the model; included fragments
 are merged into the including file first: mappings merge, lists append, the including file wins on scalars. Props are written
-`"enum(low,medium,high) = medium inherit required"` or as `{type, values, default, inherit, required}`. Relation targets are an
+`"enum(low,medium,high) = medium inherit required"` or as `{type, description, values, default, inherit, required}`, where
+`values` is a list or a mapping of value -> meaning (only the mapping form can carry a `description` and value meanings;
+entity types and relation types take a `description` too). The viewer shows them as field help and the generators carry them.
+A `ref` prop (`{type: ref, to: [User, Team]}` or `"ref(User,Team)"`) points at an entity by its name, id or a `key: true`
+prop such as a User's email; the viewer links it, and a value that names no such entity is a validation warning. Relation targets are an
 entity name, a capability path, a unique capability name, or an `id`.
 
 Every capability and entity carries a universal `id` (a UUID) that stays the same through renames and moves; validation

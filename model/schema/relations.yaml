@@ -1,27 +1,49 @@
-# Relation types an entity can use under `relations:`.
+# Relation types an entity can use under `relations:`. Attrs take the same forms as props (see entity-types.yaml).
 kind: Schema
 relations:
   exposes:
+    description: The entity delivers this capability for the rest of the organisation.
     from: [Asset, Team]
     to: [Capability]
     attrs:
-      coverage: enum(full,partial) = full
+      coverage:
+        type: enum
+        description: How much of the capability this entity delivers.
+        values:
+          full: Delivers the whole capability.
+          partial: Delivers only part of it; another provider is needed for the rest.
+        default: full
     inverse: exposed_by
     min_level: 3
     conflicts_with: [requires]
   requires:
+    description: The entity needs this capability to do its job. Something active must expose it.
     from: [Asset, Team]
     to: [Capability]
     attrs:
-      dependency: enum(hard,soft) = hard
+      dependency:
+        type: enum
+        description: What happens to the entity when nothing provides the capability.
+        values:
+          hard: It cannot operate. An unmet hard requirement is a break.
+          soft: It keeps running in a degraded way.
+        default: hard
     inverse: required_by
     min_level: 3
     satisfied_by: [exposes]
   depends_on:
+    description: The application calls or relies on another application or service at runtime.
     from: [Application]
     to: [Application, Service]
     attrs:
-      criticality: enum(low,medium,high) = medium
+      criticality:
+        type: enum
+        description: How badly the application suffers when the dependency fails.
+        values:
+          low: Hardly noticed, or easily worked around.
+          medium: Some features fail; the rest keeps working.
+          high: The application stops working.
+        default: medium
     inverse: dependents
     transitive: true
     no_cycles: true
