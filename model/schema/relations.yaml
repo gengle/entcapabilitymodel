@@ -1,0 +1,27 @@
+# Relation types an entity can use under `relations:`.
+kind: Schema
+relations:
+  exposes:
+    from: [Asset, Team]
+    to: [Capability]
+    attrs:
+      coverage: enum(full,partial) = full
+    inverse: exposed_by
+    min_level: 3
+    conflicts_with: [requires]
+  requires:
+    from: [Asset, Team]
+    to: [Capability]
+    attrs:
+      dependency: enum(hard,soft) = hard
+    inverse: required_by
+    min_level: 3
+    satisfied_by: [exposes]
+  depends_on:
+    from: [Application]
+    to: [Application, Service]
+    attrs:
+      criticality: enum(low,medium,high) = medium
+    inverse: dependents
+    transitive: true
+    no_cycles: true

@@ -1,0 +1,11 @@
+kind: Entity
+type: Application
+name: OCR Capture
+include: ../fragments/sso-client.yaml
+props:
+  vendor: ScanCo
+relations:
+  exposes:
+    - Invoice Capture
+  depends_on:
+    - Corporate SSO

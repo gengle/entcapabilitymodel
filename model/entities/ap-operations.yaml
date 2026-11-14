@@ -1,0 +1,10 @@
+kind: Entity
+type: Team
+name: AP Operations
+props:
+  head: Dana Reyes
+relations:
+  exposes:
+    - Payment Reconciliation
+    - target: Invoice Approval
+      coverage: partial

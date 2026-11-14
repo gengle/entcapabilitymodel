@@ -1,0 +1,12 @@
+kind: Entity
+type: Application
+name: SAP S/4
+include: ../fragments/finance-it.yaml
+props:
+  vendor: SAP
+relations:
+  exposes:
+    - Invoice Approval
+    - Payment Run
+    - target: Budgeting
+      coverage: partial

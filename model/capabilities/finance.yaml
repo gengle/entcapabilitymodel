@@ -1,0 +1,17 @@
+kind: Capability
+name: Finance
+# Accounts Payable lives in its own file and attaches itself with `parent: Finance`.
+include: finance/accounts-payable.yaml
+props:
+  owner: CFO Office
+  criticality: high
+  review_cycle_days: 90
+children:
+  - name: Financial Planning
+    props:
+      criticality: medium
+    children:
+      - name: Budgeting
+        props:
+          maturity: defined
+      - name: Forecasting

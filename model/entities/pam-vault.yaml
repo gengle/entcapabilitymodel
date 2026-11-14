@@ -1,0 +1,8 @@
+kind: Entity
+type: Service
+name: PAM Vault
+props:
+  owner: Identity Team
+relations:
+  exposes:
+    - Privileged Access

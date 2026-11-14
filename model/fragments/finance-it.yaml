@@ -1,0 +1,3 @@
+# Fragment (no kind): merged into every entity that includes it. The entity's own values win.
+props:
+  owner: Finance IT

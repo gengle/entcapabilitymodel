@@ -1,0 +1,18 @@
+# Entity types with is-a inheritance (extends). Props are written as "type [= default] [inherit] [required]"
+# or as a mapping: {type: enum, values: [a, b], default: a, required: true}.
+kind: Schema
+entity_types:
+  Asset:
+    props:
+      owner: string
+      lifecycle: enum(plan,active,retire) = active
+  Application:
+    extends: Asset
+    props:
+      vendor: string
+  Service:
+    extends: Asset
+  Team:
+    props:
+      head: string
+      lifecycle: enum(plan,active,retire) = active

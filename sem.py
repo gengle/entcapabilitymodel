@@ -8,12 +8,14 @@ EDIT       add "L1/L2/L3" [k=v ..] [-p] | set <capability> k=v ..
 META       type add <Name> [Parent] | type prop <Type> "key: type [= default]"
            relation add <name> <from|from> <to|to> [inverse=x] [transitive] [no_cycles]
 NAVIGATE   neighbors <ref> | closure <ref> <relation> | path <A> <B> | who <ref> | gaps | coverage | impact <Entity>
-GENERATE   gen <site|sql|typeql|jsonschema|openapi|mermaid|csv|all> <outdir> [--level N]
-<ref> is an entity name, or a capability path / unique capability name.  Model file: $SEM_MODEL or ./model.sem
+GENERATE   gen <site|sql|typeql|jsonschema|openapi|mermaid|csv|all> <outdir> [--level N] | yaml <outdir>
+<ref> is an entity name, or a capability path / unique capability name.
+Model: $SEM_MODEL, else ./model/ (YAML, see semyaml.py) if present, else ./model.sem. A YAML model is read-only
+here: EDIT and META commands refuse it, edit its files (or use server.py). `yaml <outdir>` converts any model.
 """
 import collections, json, os, re, sys
 
-MODEL = os.environ.get("SEM_MODEL", "model.sem")
+MODEL = os.environ.get("SEM_MODEL") or ("model" if os.path.isdir("model") else "model.sem")
 PROP_RE = re.compile(r'^(\w+):\s*(\w+)(?:\(([^)]*)\))?(?:\s*=\s*("[^"]*"|\S+))?((?:\s+(?:inherit|required))*)\s*$')
 REL_RE = re.compile(r'^(\w+)\s+(.+?)(?:\s*\[([^\]]*)\])?\s*$')
 
@@ -189,6 +191,13 @@ class Model:
 
 
 def load(path):
+    if os.path.isdir(path) or path.endswith((".yaml", ".yml")):
+        import semyaml
+        return semyaml.load(path, sys.modules[__name__])
+    return load_sem(path)
+
+
+def load_sem(path):
     m, stack, cur, section, et, rt, ent = Model(), [], None, None, None, None, None
     for ln, raw in enumerate(open(path), 1):
         if not raw.strip() or raw.lstrip().startswith("#"):
@@ -395,7 +404,7 @@ def adjacency(m):
 
 
 def validate(m):
-    errs, warns = [], []
+    errs, warns = list(getattr(m, "load_errors", [])), []
     limit = m.depth_limit()
     for t in m.etypes.values():
         if t.parent and t.parent not in m.etypes:
@@ -764,6 +773,8 @@ def kv(args):
 
 
 def commit(m, what, strict=False):
+    if getattr(m, "yaml", False):
+        sys.exit(f"REJECTED: {MODEL} is a YAML model; edit its files (or use server.py) instead")
     m.link()
     errs, warns = validate(m)
     if errs or (strict and warns):
@@ -908,6 +919,10 @@ def main():
                 sys.exit(f"unknown option '{x}'")
         m.rtypes[rt.name] = rt
         commit(m, f"added relation {rt.name}: {'|'.join(rt.frm)} -> {'|'.join(rt.to)}")
+    elif cmd == "yaml" and rest:
+        import semyaml
+        for p in semyaml.dump(m, sys.modules[__name__], rest[0]):
+            print("wrote", p)
     elif cmd == "gen" and len(rest) >= 2:
         import gen
         lv = int(rest[rest.index("--level") + 1]) if "--level" in rest else 3

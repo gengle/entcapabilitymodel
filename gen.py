@@ -9,7 +9,7 @@ def slug(s):
 def w(outdir, name, text):
     p = os.path.join(outdir, name)
     os.makedirs(os.path.dirname(p), exist_ok=True)
-    open(p, "w").write(text)
+    open(p, "w", encoding="utf-8", newline="\n").write(text)
     return p
 
 
@@ -314,7 +314,7 @@ def gen_mermaid(S, m, out, level):
 
 def gen_csv(S, m, out, level):
     os.makedirs(out, exist_ok=True)
-    with open(os.path.join(out, "capabilities.csv"), "w", newline="") as f:
+    with open(os.path.join(out, "capabilities.csv"), "w", newline="", encoding="utf-8") as f:
         c = csv.writer(f)
         c.writerow(["path", "name", "level"] + list(m.props))
         for n in m.all_nodes():
@@ -324,14 +324,14 @@ def gen_csv(S, m, out, level):
         for k in S.eprops(m, e):
             if k not in keys:
                 keys.append(k)
-    with open(os.path.join(out, "entities.csv"), "w", newline="") as f:
+    with open(os.path.join(out, "entities.csv"), "w", newline="", encoding="utf-8") as f:
         c = csv.writer(f)
         c.writerow(["name", "type"] + keys)
         for e in m.entities:
             pr = S.eprops(m, e)
             c.writerow([e.name, e.type] + [pr.get(k, "") for k in keys])
     ak = sorted({k for rt in m.rtypes.values() for k in rt.attrs})
-    with open(os.path.join(out, "relations.csv"), "w", newline="") as f:
+    with open(os.path.join(out, "relations.csv"), "w", newline="", encoding="utf-8") as f:
         c = csv.writer(f)
         c.writerow(["source", "relation", "target", "target_kind"] + ak)
         for e in m.entities:

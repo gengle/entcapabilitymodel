@@ -1,0 +1,5 @@
+kind: Entity
+type: Service
+name: "ConfigService"
+props: {}
+relations: {}

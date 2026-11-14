@@ -1,0 +1,4 @@
+# Fragment: anything that signs users in through corporate SSO. Lists append to the entity's own.
+relations:
+  requires:
+    - Single Sign-On

@@ -1,0 +1,15 @@
+kind: Entity
+type: Application
+name: ApproveIt
+include:
+  - ../fragments/finance-it.yaml
+  - ../fragments/sso-client.yaml
+relations:
+  exposes:
+    - target: Invoice Approval
+      coverage: partial
+  requires:
+    - Privileged Access
+  depends_on:
+    - target: SAP S/4
+      criticality: high

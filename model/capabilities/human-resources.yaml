@@ -1,0 +1,14 @@
+kind: Capability
+name: Human Resources
+props:
+  owner: CHRO Office
+children:
+  - name: Talent Acquisition
+    children:
+      - name: Recruiting
+        children:
+          - name: Candidate Sourcing
+            props:
+              maturity: defined
+          - name: Interview Scheduling
+      - name: Onboarding

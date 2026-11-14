@@ -28,10 +28,29 @@
   "ent:Corporate SSO",
   "ent:Match Engine",
   "ent:OCR Capture",
+  "ent:PAM Vault",
   "ent:SAP S/4",
   "ent:Talent Platform"
  ],
  "edges": [
+  {
+   "s": "cap:Finance",
+   "rel": "parent_of",
+   "d": "cap:Finance/Financial Planning",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Finance/Financial Planning",
+   "rel": "parent_of",
+   "d": "cap:Finance/Financial Planning/Budgeting",
+   "attrs": {}
+  },
+  {
+   "s": "cap:Finance/Financial Planning",
+   "rel": "parent_of",
+   "d": "cap:Finance/Financial Planning/Forecasting",
+   "attrs": {}
+  },
   {
    "s": "cap:Finance",
    "rel": "parent_of",
@@ -78,24 +97,6 @@
    "s": "cap:Finance/Accounts Payable/Supplier Payments",
    "rel": "parent_of",
    "d": "cap:Finance/Accounts Payable/Supplier Payments/Payment Reconciliation",
-   "attrs": {}
-  },
-  {
-   "s": "cap:Finance",
-   "rel": "parent_of",
-   "d": "cap:Finance/Financial Planning",
-   "attrs": {}
-  },
-  {
-   "s": "cap:Finance/Financial Planning",
-   "rel": "parent_of",
-   "d": "cap:Finance/Financial Planning/Budgeting",
-   "attrs": {}
-  },
-  {
-   "s": "cap:Finance/Financial Planning",
-   "rel": "parent_of",
-   "d": "cap:Finance/Financial Planning/Forecasting",
    "attrs": {}
   },
   {
@@ -153,27 +154,13 @@
    "attrs": {}
   },
   {
-   "s": "ent:SAP S/4",
+   "s": "ent:AP Operations",
    "rel": "exposes",
-   "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Approval",
+   "d": "cap:Finance/Accounts Payable/Supplier Payments/Payment Reconciliation",
    "attrs": {}
   },
   {
-   "s": "ent:SAP S/4",
-   "rel": "exposes",
-   "d": "cap:Finance/Accounts Payable/Supplier Payments/Payment Run",
-   "attrs": {}
-  },
-  {
-   "s": "ent:SAP S/4",
-   "rel": "exposes",
-   "d": "cap:Finance/Financial Planning/Budgeting",
-   "attrs": {
-    "coverage": "partial"
-   }
-  },
-  {
-   "s": "ent:ApproveIt",
+   "s": "ent:AP Operations",
    "rel": "exposes",
    "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Approval",
    "attrs": {
@@ -194,6 +181,14 @@
   },
   {
    "s": "ent:ApproveIt",
+   "rel": "exposes",
+   "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Approval",
+   "attrs": {
+    "coverage": "partial"
+   }
+  },
+  {
+   "s": "ent:ApproveIt",
    "rel": "depends_on",
    "d": "ent:SAP S/4",
    "attrs": {
@@ -201,21 +196,9 @@
    }
   },
   {
-   "s": "ent:OCR Capture",
+   "s": "ent:Corporate SSO",
    "rel": "exposes",
-   "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Capture",
-   "attrs": {}
-  },
-  {
-   "s": "ent:OCR Capture",
-   "rel": "requires",
    "d": "cap:Technology/Security/Access Management/Single Sign-On",
-   "attrs": {}
-  },
-  {
-   "s": "ent:OCR Capture",
-   "rel": "depends_on",
-   "d": "ent:Corporate SSO",
    "attrs": {}
   },
   {
@@ -241,10 +224,48 @@
    }
   },
   {
-   "s": "ent:Talent Platform",
-   "rel": "exposes",
-   "d": "cap:Human Resources/Talent Acquisition/Recruiting",
+   "s": "ent:OCR Capture",
+   "rel": "requires",
+   "d": "cap:Technology/Security/Access Management/Single Sign-On",
    "attrs": {}
+  },
+  {
+   "s": "ent:OCR Capture",
+   "rel": "exposes",
+   "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Capture",
+   "attrs": {}
+  },
+  {
+   "s": "ent:OCR Capture",
+   "rel": "depends_on",
+   "d": "ent:Corporate SSO",
+   "attrs": {}
+  },
+  {
+   "s": "ent:PAM Vault",
+   "rel": "exposes",
+   "d": "cap:Technology/Security/Access Management/Privileged Access",
+   "attrs": {}
+  },
+  {
+   "s": "ent:SAP S/4",
+   "rel": "exposes",
+   "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Approval",
+   "attrs": {}
+  },
+  {
+   "s": "ent:SAP S/4",
+   "rel": "exposes",
+   "d": "cap:Finance/Accounts Payable/Supplier Payments/Payment Run",
+   "attrs": {}
+  },
+  {
+   "s": "ent:SAP S/4",
+   "rel": "exposes",
+   "d": "cap:Finance/Financial Planning/Budgeting",
+   "attrs": {
+    "coverage": "partial"
+   }
   },
   {
    "s": "ent:Talent Platform",
@@ -253,24 +274,10 @@
    "attrs": {}
   },
   {
-   "s": "ent:Corporate SSO",
+   "s": "ent:Talent Platform",
    "rel": "exposes",
-   "d": "cap:Technology/Security/Access Management/Single Sign-On",
+   "d": "cap:Human Resources/Talent Acquisition/Recruiting",
    "attrs": {}
-  },
-  {
-   "s": "ent:AP Operations",
-   "rel": "exposes",
-   "d": "cap:Finance/Accounts Payable/Supplier Payments/Payment Reconciliation",
-   "attrs": {}
-  },
-  {
-   "s": "ent:AP Operations",
-   "rel": "exposes",
-   "d": "cap:Finance/Accounts Payable/Invoice Management/Invoice Approval",
-   "attrs": {
-    "coverage": "partial"
-   }
   }
  ]
 }

@@ -1,0 +1,8 @@
+kind: Entity
+type: Service
+name: Corporate SSO
+props:
+  owner: Identity Team
+relations:
+  exposes:
+    - Single Sign-On

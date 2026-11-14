@@ -1,0 +1,27 @@
+kind: Capability
+parent: Finance
+name: Accounts Payable
+props:
+  owner: Dana Reyes
+children:
+  - name: Invoice Management
+    children:
+      - name: Invoice Capture
+        props:
+          maturity: defined
+      - name: Three-Way Matching
+        props:
+          maturity: pilot
+      - name: Invoice Approval
+        props:
+          maturity: defined
+  - name: Supplier Payments
+    props:
+      maturity: optimized
+    children:
+      - name: Payment Run
+        props:
+          maturity: optimized
+      - name: Payment Reconciliation
+        props:
+          maturity: defined

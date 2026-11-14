@@ -1,0 +1,17 @@
+# The capability tree: its levels, the properties every capability has, and model-wide rules.
+kind: Schema
+root: Capability
+levels:
+  1: Domain
+  2: Capability group
+  3: Capability
+  4: Sub-capability
+props:
+  owner: string inherit required
+  criticality: enum(low,medium,high) = medium inherit
+  review_cycle_days: int = 180 inherit
+  maturity: enum(initial,pilot,defined,optimized) = initial
+  lifecycle: enum(plan,active,retire) = active
+rules:
+  no_active_under_retired: true
+  unmet_requirements: warn

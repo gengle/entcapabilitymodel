@@ -1,0 +1,13 @@
+kind: Entity
+type: Application
+name: Match Engine
+include: ../fragments/finance-it.yaml
+relations:
+  exposes:
+    - target: Three-Way Matching
+      coverage: partial
+  requires:
+    - Invoice Capture
+  depends_on:
+    - target: OCR Capture
+      criticality: high

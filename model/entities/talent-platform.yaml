@@ -1,0 +1,9 @@
+kind: Entity
+type: Application
+name: Talent Platform
+include: ../fragments/sso-client.yaml
+props:
+  vendor: Acme HR Cloud
+relations:
+  exposes:
+    - Recruiting

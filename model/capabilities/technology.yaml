@@ -1,0 +1,14 @@
+kind: Capability
+name: Technology
+props:
+  owner: CIO Office
+  criticality: high
+children:
+  - name: Security
+    children:
+      - name: Access Management
+        children:
+          - name: Single Sign-On
+            props:
+              maturity: optimized
+          - name: Privileged Access
