@@ -1,0 +1,35 @@
+# DRAFT - generated, not run against a TypeDB server. Check syntax against your TypeDB 3.x version.
+define
+
+attribute path, value string;
+attribute name, value string;
+attribute owner, value string;
+attribute criticality, value string;
+attribute review_cycle_days, value integer;
+attribute maturity, value string;
+attribute lifecycle, value string;
+attribute vendor, value string;
+attribute head, value string;
+attribute exposes_coverage, value string;
+attribute requires_dependency, value string;
+attribute depends_on_criticality, value string;
+
+entity capability, owns path @key, owns name, owns owner, owns criticality, owns review_cycle_days, owns maturity, owns lifecycle, plays capability_hierarchy:parent, plays capability_hierarchy:child, plays exposes:target, plays requires:target;
+relation capability_hierarchy, relates parent, relates child;
+entity asset, owns name @key, owns owner, owns lifecycle;
+entity application sub asset, owns vendor;
+entity service sub asset;
+entity team, owns name @key, owns head, owns lifecycle;
+relation exposes, relates source, relates target, owns exposes_coverage;
+asset plays exposes:source;
+team plays exposes:source;
+relation requires, relates source, relates target, owns requires_dependency;
+asset plays requires:source;
+team plays requires:source;
+relation depends_on, relates source, relates target, owns depends_on_criticality;
+application plays depends_on:source;
+application plays depends_on:target;
+service plays depends_on:target;
+
+# rules and constraints (min_level, no_cycles, satisfied_by) are enforced in the generating model, not in this schema.
+

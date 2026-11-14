@@ -1,0 +1,24 @@
+path,name,level,owner,criticality,review_cycle_days,maturity,lifecycle
+Finance,Finance,1,CFO Office,high,90,initial,active
+Finance/Accounts Payable,Accounts Payable,2,Dana Reyes,high,90,initial,active
+Finance/Accounts Payable/Invoice Management,Invoice Management,3,Dana Reyes,high,90,initial,active
+Finance/Accounts Payable/Invoice Management/Invoice Capture,Invoice Capture,4,Dana Reyes,high,90,defined,active
+Finance/Accounts Payable/Invoice Management/Three-Way Matching,Three-Way Matching,4,Dana Reyes,high,90,pilot,active
+Finance/Accounts Payable/Invoice Management/Invoice Approval,Invoice Approval,4,Dana Reyes,high,90,defined,active
+Finance/Accounts Payable/Supplier Payments,Supplier Payments,3,Dana Reyes,high,90,optimized,active
+Finance/Accounts Payable/Supplier Payments/Payment Run,Payment Run,4,Dana Reyes,high,90,optimized,active
+Finance/Accounts Payable/Supplier Payments/Payment Reconciliation,Payment Reconciliation,4,Dana Reyes,high,90,defined,active
+Finance/Financial Planning,Financial Planning,2,CFO Office,medium,90,initial,active
+Finance/Financial Planning/Budgeting,Budgeting,3,CFO Office,medium,90,defined,active
+Finance/Financial Planning/Forecasting,Forecasting,3,CFO Office,medium,90,initial,active
+Human Resources,Human Resources,1,CHRO Office,medium,180,initial,active
+Human Resources/Talent Acquisition,Talent Acquisition,2,CHRO Office,medium,180,initial,active
+Human Resources/Talent Acquisition/Recruiting,Recruiting,3,CHRO Office,medium,180,initial,active
+Human Resources/Talent Acquisition/Recruiting/Candidate Sourcing,Candidate Sourcing,4,CHRO Office,medium,180,defined,active
+Human Resources/Talent Acquisition/Recruiting/Interview Scheduling,Interview Scheduling,4,CHRO Office,medium,180,initial,active
+Human Resources/Talent Acquisition/Onboarding,Onboarding,3,CHRO Office,medium,180,initial,active
+Technology,Technology,1,CIO Office,high,180,initial,active
+Technology/Security,Security,2,CIO Office,high,180,initial,active
+Technology/Security/Access Management,Access Management,3,CIO Office,high,180,initial,active
+Technology/Security/Access Management/Single Sign-On,Single Sign-On,4,CIO Office,high,180,optimized,active
+Technology/Security/Access Management/Privileged Access,Privileged Access,4,CIO Office,high,180,initial,active

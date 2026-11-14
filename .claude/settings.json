@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python sem.py validate:*)",
+      "Bash(python sem.py tree:*)",
+      "Bash(python sem.py schema:*)",
+      "Bash(python sem.py show:*)",
+      "Bash(python sem.py neighbors:*)",
+      "Bash(python sem.py closure:*)",
+      "Bash(python sem.py path:*)",
+      "Bash(python sem.py who:*)",
+      "Bash(python sem.py gaps:*)",
+      "Bash(python sem.py coverage:*)",
+      "Bash(python sem.py impact:*)",
+      "Bash(python sem.py diff:*)",
+      "Bash(python sem.py entity list:*)",
+      "Bash(python sem.py gen:*)"
+    ],
+    "deny": [
+      "Read(./__pycache__/**)"
+    ]
+  }
+}

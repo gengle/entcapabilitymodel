@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Capability model",
+  "type": "object",
+  "properties": {
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Capability"
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/Asset"
+          },
+          {
+            "$ref": "#/$defs/Application"
+          },
+          {
+            "$ref": "#/$defs/Service"
+          },
+          {
+            "$ref": "#/$defs/Team"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "Capability": {
+      "type": "object",
+      "required": [
+        "path",
+        "level"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "owner": {
+          "type": "string"
+        },
+        "criticality": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "review_cycle_days": {
+          "type": "integer"
+        },
+        "maturity": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "pilot",
+            "defined",
+            "optimized"
+          ]
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "active",
+            "retire"
+          ]
+        }
+      }
+    },
+    "Link": {
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "attrs": {
+          "type": "object"
+        }
+      }
+    },
+    "Asset": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "active",
+            "retire"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "relations": {
+          "type": "object",
+          "properties": {
+            "exposes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link_exposes"
+              }
+            },
+            "requires": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link_requires"
+              }
+            },
+            "depends_on": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link_depends_on"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "Application": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vendor": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "Service": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Asset"
+        },
+        {
+          "type": "object",
+          "properties": {}
+        }
+      ]
+    },
+    "Team": {
+      "type": "object",
+      "properties": {
+        "head": {
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "active",
+            "retire"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "relations": {
+          "type": "object",
+          "properties": {
+            "exposes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link_exposes"
+              }
+            },
+            "requires": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link_requires"
+              }
+            },
+            "depends_on": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Link_depends_on"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "Link_exposes": {
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Capability"
+        },
+        "attrs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "coverage": {
+              "type": "string",
+              "enum": [
+                "full",
+                "partial"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Link_requires": {
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Capability"
+        },
+        "attrs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dependency": {
+              "type": "string",
+              "enum": [
+                "hard",
+                "soft"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Link_depends_on": {
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Application->Service"
+        },
+        "attrs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "criticality": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

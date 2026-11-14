@@ -1,0 +1,8 @@
+name,type,owner,lifecycle,vendor,head
+SAP S/4,Application,Finance IT,active,SAP,
+ApproveIt,Application,Finance IT,active,,
+OCR Capture,Application,,active,ScanCo,
+Match Engine,Application,Finance IT,active,,
+Talent Platform,Application,,active,Acme HR Cloud,
+Corporate SSO,Service,Identity Team,active,,
+AP Operations,Team,,active,,Dana Reyes

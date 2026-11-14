@@ -1,0 +1,689 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Capability model API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/capabilities": {
+      "get": {
+        "summary": "List capabilities",
+        "parameters": [
+          {
+            "name": "level",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Capability"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/capabilities/{path}": {
+      "get": {
+        "summary": "Get a capability",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capability"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/coverage": {
+      "get": {
+        "summary": "Providers per capability",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/gaps": {
+      "get": {
+        "summary": "Unmet requirements",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/assets": {
+      "get": {
+        "summary": "List Asset entities",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Asset"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Asset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Asset"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/assets/{name}": {
+      "get": {
+        "summary": "Get Asset",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/applications": {
+      "get": {
+        "summary": "List Application entities",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Application"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Application",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Application"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/applications/{name}": {
+      "get": {
+        "summary": "Get Application",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/services": {
+      "get": {
+        "summary": "List Service entities",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Service"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Service",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Service"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/services/{name}": {
+      "get": {
+        "summary": "Get Service",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams": {
+      "get": {
+        "summary": "List Team entities",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Team"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Team",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/teams/{name}": {
+      "get": {
+        "summary": "Get Team",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{name}/exposes": {
+      "get": {
+        "summary": "exposes links (Asset|Team -> Capability)",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Link_exposes"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{name}/requires": {
+      "get": {
+        "summary": "requires links (Asset|Team -> Capability)",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Link_requires"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{name}/depends_on": {
+      "get": {
+        "summary": "depends_on links (Application -> Application|Service)",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Link_depends_on"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Capability": {
+        "type": "object",
+        "required": [
+          "path",
+          "level"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "owner": {
+            "type": "string"
+          },
+          "criticality": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "review_cycle_days": {
+            "type": "integer"
+          },
+          "maturity": {
+            "type": "string",
+            "enum": [
+              "initial",
+              "pilot",
+              "defined",
+              "optimized"
+            ]
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "active",
+              "retire"
+            ]
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "attrs": {
+            "type": "object"
+          }
+        }
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "active",
+              "retire"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "relations": {
+            "type": "object",
+            "properties": {
+              "exposes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_exposes"
+                }
+              },
+              "requires": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_requires"
+                }
+              },
+              "depends_on": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_depends_on"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Application": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Asset"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "vendor": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Service": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Asset"
+          },
+          {
+            "type": "object",
+            "properties": {}
+          }
+        ]
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "head": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "active",
+              "retire"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "relations": {
+            "type": "object",
+            "properties": {
+              "exposes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_exposes"
+                }
+              },
+              "requires": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_requires"
+                }
+              },
+              "depends_on": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Link_depends_on"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Link_exposes": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Capability"
+          },
+          "attrs": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "coverage": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Link_requires": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Capability"
+          },
+          "attrs": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "dependency": {
+                "type": "string",
+                "enum": [
+                  "hard",
+                  "soft"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Link_depends_on": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Application->Service"
+          },
+          "attrs": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "criticality": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
