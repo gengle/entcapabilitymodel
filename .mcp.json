@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "hippo-memory": {
+      "type": "stdio",
+      "command": "hippo",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}

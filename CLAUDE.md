@@ -30,3 +30,17 @@ python sem.py gen all out [--level N]   # or one of: site sql typeql jsonschema 
 - **Generators** (`gen.py`): `run(S, m, kind, outdir, level)` gets the `sem` module passed in as `S` (to avoid a circular import) and refuses to run if the model has errors. Add a generator by writing `gen_x(S, m, out, level)` and registering it in `GENS`. Everything is derived from the model's metadata, so new types/relations/props flow through without generator changes.
 - The SQL output reproduces unmet/coverage/closure as views; JSON Schema and TypeQL do **not** enforce model rules, and TypeQL output is an untested draft.
 - `out/` is generated; regenerate it instead of hand-editing.
+
+<!-- hippo:start -->
+## Project Memory (Hippo)
+
+The installed UserPromptSubmit hook injects pinned rules and the memories
+that match each prompt, so never load them yourself. If no hippo memory
+block has appeared in this session, run this at the start of a task:
+```bash
+hippo context --auto --budget 1500
+```
+
+The installed hooks store failed tool calls and capture the session when it
+ends, so there is nothing to record or run by hand.
+<!-- hippo:end -->
