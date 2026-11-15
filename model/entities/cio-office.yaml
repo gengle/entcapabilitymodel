@@ -2,5 +2,6 @@ kind: Entity
 type: Team
 name: "CIO Office"
 id: 38bb4851-c95c-4f28-b3cb-5168b1a8bcce
-props: {}
+props:
+  head: Greg Engle
 relations: {}

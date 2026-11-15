@@ -17,3 +17,5 @@ children:
               maturity: optimized
           - name: Privileged Access
             id: ce18fd25-f366-46a7-89f4-3a39afcb335e
+      - name: Enterprise Architecture
+        id: 74f64a6b-c338-4eb2-8f7b-39afcc367113

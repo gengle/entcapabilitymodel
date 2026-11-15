@@ -6,3 +6,4 @@ props: {}
 relations:
   exposes:
     - Interview Scheduling
+    - Invoice Capture

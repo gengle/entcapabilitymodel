@@ -6,3 +6,7 @@
 #   select / radio / combo on a non-enum field take options: [...]; slider takes min, max and step.
 capability:
   review_cycle_days: {control: select, options: [30, 60, 90, 180, 365]}
+relation:
+  exposes.coverage: {control: radio}
+  requires.dependency: {control: radio}
+  depends_on.criticality: {control: radio}

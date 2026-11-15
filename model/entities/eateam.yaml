@@ -1,0 +1,8 @@
+kind: Entity
+type: Team
+name: "EATeam"
+id: 4b105e4a-461f-41d0-9e10-50ccd79443c6
+props: {}
+relations:
+  exposes:
+    - Enterprise Architecture
