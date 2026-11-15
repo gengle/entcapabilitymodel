@@ -1,4 +1,5 @@
-# Dynamic semantic model (sem.py + semmodel/ + semyaml.py + gen.py + server.py)
+# Developer Dynamic Semantic Model
+
 The model lives in `model/` as YAML and is the single source of truth. It defines capability levels/props, entity types (is-a),
 relation types (domain/range, attrs, inverse, min_level, satisfied_by, conflicts_with, transitive, no_cycles), the capability
 tree, and one file per entity. Generators read the model, so schema changes flow through. Needs Python 3 with PyYAML.
