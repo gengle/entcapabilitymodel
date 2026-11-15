@@ -71,69 +71,86 @@ def prop_json(p):
             "description": p.description, "valueDocs": p.docs, "to": p.targets or None, "key": p.key}
 
 
-def snapshot(m):
-    errs, warns = sem.validate(m)
-    verbs, min_lv = sem.provide_verbs(m), sem.provide_min_level(m)
-    nodes, ents = m.all_nodes(), m.entities
-    incoming = collections.defaultdict(list)
-    for e in ents:
-        for r in e.rels:
-            if r["target"] is not None and r["verb"] in m.rtypes:
-                rt = m.rtypes[r["verb"]]
-                incoming[sem.nid(r["target"])].append({"verb": rt.name, "inverse": rt.inverse or f"~{rt.name}",
-                                                       "from": sem.eid(e), "attrs": r["attrs"], "src": r.get("src")})
-    for x, p, t in sem.refs(m):  # ref props (e.g. owner) point at entities too
-        incoming[sem.eid(t)].append({"verb": p.name, "inverse": f"{p.name}_of", "from": sem.nid(x), "attrs": {},
-                                     "src": x.prop_src.get(p.name)})
+class Index:
+    """Per-snapshot lookups built once: incoming references, provider levels, and ref resolution."""
 
-    def ref_id(p, v):
-        t = m.ref(p, v)
+    def __init__(self, m):
+        self.m = m
+        self.verbs, self.min_lv = sem.provide_verbs(m), sem.provide_min_level(m)
+        self.incoming = collections.defaultdict(list)
+        for e in m.entities:
+            for r in e.rels:
+                if r["target"] is not None and r["verb"] in m.rtypes:
+                    rt = m.rtypes[r["verb"]]
+                    self.incoming[sem.nid(r["target"])].append({
+                        "verb": rt.name, "inverse": rt.inverse or f"~{rt.name}", "from": sem.eid(e),
+                        "attrs": r["attrs"], "src": r.get("src")})
+        for x, p, t in sem.refs(m):  # ref props (e.g. owner) point at entities too
+            self.incoming[sem.eid(t)].append({"verb": p.name, "inverse": f"{p.name}_of", "from": sem.nid(x),
+                                              "attrs": {}, "src": x.prop_src.get(p.name)})
+
+    def ref_id(self, p, v):
+        t = self.m.ref(p, v)
         return sem.eid(t) if t else None
 
-    def cap(n):
-        props = []
-        for p in m.props.values():
-            try:
-                v, origin = m.resolve(n, p)
-            except ValueError as x:
-                v, origin = n.local.get(p.name), f"invalid: {x}"
-            src = None
-            if origin == "local":
-                src = n.prop_src.get(p.name)
-            elif origin.startswith("inherited from "):
-                a = m.find(origin[len("inherited from "):])
-                src = a and a.prop_src.get(p.name)
-            props.append({"name": p.name, "value": v, "origin": origin, "src": src, "ref": ref_id(p, v)})
-        direct = [sem.eid(e) for e in ents if any(r["verb"] in verbs and r["target"] is n for r in e.rels)]
-        rolled = [sem.eid(e) for e in sem.providers(m, n)]
-        status = None if n.level() < min_lv else "white" if not rolled else "overlap" if len(direct) >= 2 else "ok"
-        return {"id": sem.cid(n), "uid": n.uid, "name": n.name, "path": n.path(), "level": n.level(), "levelName": m.levels.get(n.level(), ""),
-                "src": n.src, "props": props, "extra": [k for k in n.local if k not in m.props],
-                "providers": direct, "rolledProviders": rolled, "status": status,
-                "incoming": incoming[sem.cid(n)], "children": [cap(c) for c in n.children]}
 
-    def ent(e):
-        defs = m.eprop_defs(e.type) if e.type in m.etypes else {}
-        props = [{"name": k, "value": e.local.get(k, p.default),
-                  "origin": "local" if k in e.local else "default" if p.default is not None else "unset",
-                  "src": e.prop_src.get(k), "ref": ref_id(p, e.local.get(k, p.default))} for k, p in defs.items()]
-        props += [{"name": k, "value": v, "origin": "unknown", "src": e.prop_src.get(k), "ref": None}
-                  for k, v in e.local.items() if k not in defs]
-        rels = [{"verb": r["verb"], "text": r["text"], "target": sem.nid(r["target"]) if r["target"] is not None else None,
-                 "label": sem.target_text(r), "attrs": r["attrs"], "src": r.get("src"), "err": r["err"]} for r in e.rels]
-        return {"id": sem.eid(e), "uid": e.uid, "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
-                "retired": sem.retired(e), "props": props, "relations": rels, "incoming": incoming[sem.eid(e)],
-                "impact": impact_json(m, e)}
+def cap_props(ix, n):
+    m, props = ix.m, []
+    for p in m.props.values():
+        try:
+            v, origin = m.resolve(n, p)
+        except ValueError as x:
+            v, origin = n.local.get(p.name), f"invalid: {x}"
+        src = None
+        if origin == "local":
+            src = n.prop_src.get(p.name)
+        elif origin.startswith("inherited from "):
+            a = m.find(origin[len("inherited from "):])
+            src = a and a.prop_src.get(p.name)
+        props.append({"name": p.name, "value": v, "origin": origin, "src": src, "ref": ix.ref_id(p, v)})
+    return props
 
-    entities = [ent(e) for e in ents]
-    owners = [(f"entity {e.name}:", e.src) for e in ents] + [(f"{e.name} ", e.src) for e in ents]
-    owners += [(n.path() + ":", n.src) for n in nodes] + [(f + ":", f) for f in m.files]
+
+def cap_json(ix, n):
+    m = ix.m
+    direct = [sem.eid(e) for e in m.entities if any(r["verb"] in ix.verbs and r["target"] is n for r in e.rels)]
+    rolled = [sem.eid(e) for e in sem.providers(m, n)]
+    status = None if n.level() < ix.min_lv else "white" if not rolled else "overlap" if len(direct) >= 2 else "ok"
+    return {"id": sem.cid(n), "uid": n.uid, "name": n.name, "path": n.path(), "level": n.level(), "levelName": m.levels.get(n.level(), ""),
+            "src": n.src, "props": cap_props(ix, n), "extra": [k for k in n.local if k not in m.props],
+            "providers": direct, "rolledProviders": rolled, "status": status,
+            "incoming": ix.incoming[sem.cid(n)], "children": [cap_json(ix, c) for c in n.children]}
+
+
+def ent_json(ix, e):
+    m = ix.m
+    defs = m.eprop_defs(e.type) if e.type in m.etypes else {}
+    props = [{"name": k, "value": e.local.get(k, p.default),
+              "origin": "local" if k in e.local else "default" if p.default is not None else "unset",
+              "src": e.prop_src.get(k), "ref": ix.ref_id(p, e.local.get(k, p.default))} for k, p in defs.items()]
+    props += [{"name": k, "value": v, "origin": "unknown", "src": e.prop_src.get(k), "ref": None}
+              for k, v in e.local.items() if k not in defs]
+    rels = [{"verb": r["verb"], "text": r["text"], "target": sem.nid(r["target"]) if r["target"] is not None else None,
+             "label": sem.target_text(r), "attrs": r["attrs"], "src": r.get("src"), "err": r["err"]} for r in e.rels]
+    return {"id": sem.eid(e), "uid": e.uid, "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
+            "retired": sem.retired(e), "props": props, "relations": rels, "incoming": ix.incoming[sem.eid(e)],
+            "impact": impact_json(m, e)}
+
+
+def issue_owners(m):
+    """(message prefix, file) pairs, longest prefix first, so the first match owns the message."""
+    owners = [(f"entity {e.name}:", e.src) for e in m.entities] + [(f"{e.name} ", e.src) for e in m.entities]
+    owners += [(n.path() + ":", n.src) for n in m.all_nodes()] + [(f + ":", f) for f in m.files]
     owners.sort(key=lambda x: -len(x[0]))
+    return owners
 
-    def issue(level, msg):
-        f = next((src for pre, src in owners if msg.startswith(pre)), None)
-        return {"level": level, "msg": msg, "file": f}
 
+def issue_json(owners, level, msg):
+    return {"level": level, "msg": msg, "file": next((src for pre, src in owners if msg.startswith(pre)), None)}
+
+
+def file_infos(m):
+    """Every YAML file under the model folder with its includes, plus what each file defines."""
     files = {}
     for p in yaml_files():
         r = rel(p)
@@ -152,32 +169,46 @@ def snapshot(m):
         for inc in f["includes"]:
             if inc in files:
                 files[inc]["includedBy"].append(r)
-    for n in nodes:
+    for n in m.all_nodes():
         if n.src in files and (n.parent is m.top or n.parent.src != n.src):
             files[n.src]["defines"].append(sem.cid(n))
-    for e in ents:
+    for e in m.entities:
         if e.src in files:
             files[e.src]["defines"].append(sem.eid(e))
+    return list(files.values())
 
-    rtypes = [{"name": r.name, "from": r.frm, "to": r.to, "attrs": [prop_json(p) for p in r.attrs.values()],
-               "inverse": r.inverse, "minLevel": r.min_level, "satisfiedBy": r.satisfied_by, "conflictsWith": r.conflicts,
-               "transitive": r.transitive, "noCycles": r.no_cycles, "description": r.description} for r in m.rtypes.values()]
-    etypes = [{"name": t.name, "parent": t.parent, "chain": m.chain(t.name), "props": [prop_json(p) for p in t.props.values()],
-               "effective": list(m.eprop_defs(t.name)), "description": t.description} for t in m.etypes.values()]
-    covered = [n for n in nodes if n.level() >= min_lv]
+
+def rtype_json(r):
+    return {"name": r.name, "from": r.frm, "to": r.to, "attrs": [prop_json(p) for p in r.attrs.values()],
+            "inverse": r.inverse, "minLevel": r.min_level, "satisfiedBy": r.satisfied_by, "conflictsWith": r.conflicts,
+            "transitive": r.transitive, "noCycles": r.no_cycles, "description": r.description}
+
+
+def etype_json(m, t):
+    return {"name": t.name, "parent": t.parent, "chain": m.chain(t.name), "props": [prop_json(p) for p in t.props.values()],
+            "effective": list(m.eprop_defs(t.name)), "description": t.description}
+
+
+def snapshot(m):
+    errs, warns = sem.validate(m)
+    ix = Index(m)
+    entities = [ent_json(ix, e) for e in m.entities]
+    owners = issue_owners(m)
+    covered = [n for n in m.all_nodes() if n.level() >= ix.min_lv]
     return {
         "entry": m.entry,
         "model": {"name": m.name, "version": m.version},
         "schema": {"root": m.root_name, "levels": {str(k): v for k, v in sorted(m.levels.items())},
                    "props": [prop_json(p) for p in m.props.values()], "rules": m.rules,
-                   "entityTypes": etypes, "relationTypes": rtypes},
-        "capabilities": [cap(n) for n in m.top.children],
+                   "entityTypes": [etype_json(m, t) for t in m.etypes.values()],
+                   "relationTypes": [rtype_json(r) for r in m.rtypes.values()]},
+        "capabilities": [cap_json(ix, n) for n in m.top.children],
         "entities": entities,
-        "files": list(files.values()),
-        "issues": [issue("error", x) for x in errs] + [issue("warning", x) for x in warns],
+        "files": file_infos(m),
+        "issues": [issue_json(owners, "error", x) for x in errs] + [issue_json(owners, "warning", x) for x in warns],
         "gaps": [{"entity": sem.eid(e), "verb": rt.name, "target": sem.cid(r["target"]),
                   "dependency": r["attrs"].get("dependency", "hard"), "satisfiedBy": rt.satisfied_by} for e, r, rt in sem.unmet(m)],
-        "coverage": {"minLevel": min_lv, "total": len(covered), "covered": sum(1 for n in covered if sem.providers(m, n))},
+        "coverage": {"minLevel": ix.min_lv, "total": len(covered), "covered": sum(1 for n in covered if sem.providers(m, n))},
     }
 
 
@@ -201,7 +232,24 @@ def impact(m, name):
 
 
 # ------------------------------------------------------------------ http
+NO_ENDPOINT = (404, {"error": "no such endpoint"})
+VIEWER_MISSING = (b"<h1>Viewer not built</h1><p>Run <code>npm install && npm run build</code> in web/, "
+                  b"or <code>npm run dev</code> there and open http://localhost:5173.</p>")
+
+
+def with_version(m):
+    return {**snapshot(m), "version": version()}
+
+
 class Handler(BaseHTTPRequestHandler):
+    # (method, path) -> handler method name
+    ROUTES = {("GET", "/api/model"): "get_model", ("GET", "/api/version"): "get_version",
+              ("GET", "/api/file"): "get_file", ("GET", "/api/impact"): "get_impact",
+              ("GET", "/api/locate"): "get_locate",
+              ("POST", "/api/ids"): "post_ids", ("POST", "/api/version"): "post_version",
+              ("POST", "/api/preview"): "post_preview",
+              ("PUT", "/api/file"): "put_file", ("DELETE", "/api/file"): "delete_file"}
+
     def log_message(self, fmt, *args):
         if "/api/version" not in self.path:
             sys.stderr.write("%s %s\n" % (self.command, self.path))
@@ -222,63 +270,58 @@ class Handler(BaseHTTPRequestHandler):
     def query(self):
         return {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
 
-    def route(self, fn):
+    def dispatch(self):
         try:
-            fn()
+            url = urlparse(self.path).path
+            name = self.ROUTES.get((self.command, url))
+            if name:
+                getattr(self, name)()
+            elif self.command == "GET" and not url.startswith("/api/"):
+                self.static(url)
+            else:
+                self.send(*NO_ENDPOINT)
         except ValueError as x:
             self.send(400, {"error": str(x)})
         except Exception as x:  # keep the demo server alive and say why
             self.send(500, {"error": f"{type(x).__name__}: {x}"})
 
-    def do_GET(self):
-        self.route(self.get)
+    do_GET = do_POST = do_PUT = do_DELETE = dispatch
 
-    def do_POST(self):
-        self.route(self.post)
+    def get_model(self):
+        self.send(200, with_version(load()))
 
-    def do_PUT(self):
-        self.route(self.put)
+    def get_version(self):
+        self.send(200, {"version": version()})
 
-    def do_DELETE(self):
-        self.route(self.delete)
+    def get_file(self):
+        path = self.query().get("path")
+        p = safe_path(path)
+        if not os.path.isfile(p):
+            return self.send(404, {"error": f"no file {path}"})
+        self.send(200, {"path": rel(p), "content": open(p, encoding="utf-8").read()})
 
-    def get(self):
-        url, q = urlparse(self.path).path, self.query()
-        if url == "/api/model":
-            self.send(200, {**snapshot(load()), "version": version()})
-        elif url == "/api/version":
-            self.send(200, {"version": version()})
-        elif url == "/api/file":
-            p = safe_path(q.get("path"))
-            if not os.path.isfile(p):
-                return self.send(404, {"error": f"no file {q.get('path')}"})
-            self.send(200, {"path": rel(p), "content": open(p, encoding="utf-8").read()})
-        elif url == "/api/impact":
-            self.send(200, impact(load(), q.get("entity", "")))
-        elif url == "/api/locate":
-            m = load()
-            self.send(200, {"query": q.get("id", ""), "matches": [
-                {"id": sem.nid(x), "uid": x.uid, "kind": "capability" if isinstance(x, sem.Node) else "entity",
-                 "label": sem.describe(m, x), "file": x.src, "line": sem.id_line(m, x)} for x in sem.locate(m, q.get("id", ""))]})
-        elif url.startswith("/api/"):
-            self.send(404, {"error": "no such endpoint"})
-        else:
-            self.static(url)
+    def get_impact(self):
+        self.send(200, impact(load(), self.query().get("entity", "")))
 
-    def post(self):
-        url = urlparse(self.path).path
-        if url == "/api/ids":
-            with LOCK:
-                added = semyaml.assign_ids(ROOT)
-                return self.send(200, {**snapshot(load()), "version": version(), "added": len(added)})
-        if url == "/api/version":
-            to = str(self.body().get("to", "")).strip()
-            with LOCK:
-                new = sem.bump(semyaml.read_version(ROOT), to)  # ValueError -> 400
-                semyaml.write_version(ROOT, new)
-                return self.send(200, {**snapshot(load()), "version": version()})
-        if url != "/api/preview":
-            return self.send(404, {"error": "no such endpoint"})
+    def get_locate(self):
+        m, q = load(), self.query().get("id", "")
+        self.send(200, {"query": q, "matches": [
+            {"id": sem.nid(x), "uid": x.uid, "kind": "capability" if isinstance(x, sem.Node) else "entity",
+             "label": sem.describe(m, x), "file": x.src, "line": sem.id_line(m, x)} for x in sem.locate(m, q)]})
+
+    def post_ids(self):
+        with LOCK:
+            added = semyaml.assign_ids(ROOT)
+            self.send(200, {**with_version(load()), "added": len(added)})
+
+    def post_version(self):
+        to = str(self.body().get("to", "")).strip()
+        with LOCK:
+            new = sem.bump(semyaml.read_version(ROOT), to)  # ValueError -> 400
+            semyaml.write_version(ROOT, new)
+            self.send(200, with_version(load()))
+
+    def post_preview(self):
         b = self.body()
         files = dict(b.get("files") or {})
         if "path" in b:
@@ -288,16 +331,13 @@ class Handler(BaseHTTPRequestHandler):
     def change(self, overrides, force, apply):
         with LOCK:
             before = set(sem.validate(load())[0])
-            m = load(overrides)
-            added = [x for x in sem.validate(m)[0] if x not in before]
+            added = [x for x in sem.validate(load(overrides))[0] if x not in before]
             if added and not force:
                 return self.send(422, {"error": "rejected: the change adds validation errors", "errors": added})
             apply()
-            self.send(200, {**snapshot(load()), "version": version()})
+            self.send(200, with_version(load()))
 
-    def put(self):
-        if urlparse(self.path).path != "/api/file":
-            return self.send(404, {"error": "no such endpoint"})
+    def put_file(self):
         b = self.body()
         p, content = safe_path(b.get("path")), str(b.get("content", ""))
 
@@ -307,9 +347,7 @@ class Handler(BaseHTTPRequestHandler):
                 fh.write(content)
         self.change({p: content}, bool(b.get("force")), write)
 
-    def delete(self):
-        if urlparse(self.path).path != "/api/file":
-            return self.send(404, {"error": "no such endpoint"})
+    def delete_file(self):
         q = self.query()
         p = safe_path(q.get("path"))
         if not os.path.isfile(p):
@@ -318,8 +356,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def static(self, url):
         if not os.path.isdir(DIST):
-            return self.send(200, b"<h1>Viewer not built</h1><p>Run <code>npm install && npm run build</code> in web/, "
-                                  b"or <code>npm run dev</code> there and open http://localhost:5173.</p>", "text/html; charset=utf-8")
+            return self.send(200, VIEWER_MISSING, "text/html; charset=utf-8")
         p = os.path.normpath(os.path.join(DIST, url.lstrip("/")))
         if os.path.commonpath([p, DIST]) != DIST or not os.path.isfile(p):
             p = os.path.join(DIST, "index.html")
