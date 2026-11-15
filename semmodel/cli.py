@@ -78,6 +78,24 @@ def disp(i):
     return i.split(":", 1)[1]
 
 
+def attr_text(attrs, brackets="[]"):
+    """'k=v, k=v' wrapped in the given brackets, or '' when there are none."""
+    return brackets[0] + ", ".join(f"{k}={v}" for k, v in attrs.items()) + brackets[1] if attrs else ""
+
+
+def by_label(adj, x, brackets, sep=""):
+    """Neighbours of x grouped by relation label: {label: ['name  [attrs]', ...]}."""
+    by = collections.defaultdict(list)
+    for lab, other, attrs in adj[nid(x)]:
+        by[lab].append(disp(other) + (sep + attr_text(attrs, brackets) if attrs else ""))
+    return by
+
+
+def print_by(by):
+    for lab, items in by.items():
+        print(f"  {lab}: " + "; ".join(items))
+
+
 def cmd_tree(m):
     adj = adjacency(m)
 
@@ -140,19 +158,12 @@ def cmd_show(m, x):
             print(f"  {k:<20} {v}")
         i = eid(x)
     for lab, other, attrs in adj[i]:
-        a = " [" + ", ".join(f"{k}={v}" for k, v in attrs.items()) + "]" if attrs else ""
-        print(f"  {lab:<12} {disp(other)}{a}")
+        print(f"  {lab:<12} {disp(other)}{' ' if attrs else ''}{attr_text(attrs)}")
 
 
 def cmd_neighbors(m, x):
-    adj = adjacency(m)
-    i = nid(x)
-    by = collections.defaultdict(list)
-    for lab, other, attrs in adj[i]:
-        by[lab].append(disp(other) + ("  [" + ", ".join(f"{k}={v}" for k, v in attrs.items()) + "]" if attrs else ""))
-    print(disp(i))
-    for lab, items in by.items():
-        print(f"  {lab}: " + "; ".join(items))
+    print(disp(nid(x)))
+    print_by(by_label(adjacency(m), x, "[]", "  "))
 
 
 def cmd_closure(m, x, rel):
@@ -166,7 +177,7 @@ def cmd_closure(m, x, rel):
             if lab == rel and other not in seen:
                 seen.add(other)
                 queue.append((other, d + 1))
-                print("  " * d + f"{'-> ' if d else ''}{disp(other)}" if d else f"{disp(other)}")
+                print("  " * d + "-> " + disp(other) if d else disp(other))
                 found = True
     if not found:
         print(f"nothing reachable from {disp(start)} via '{rel}'")
@@ -197,13 +208,8 @@ def cmd_path(m, a, b):
 
 
 def cmd_who(m, x):
-    adj = adjacency(m)
     print(f"{x.path() if isinstance(x, Node) else x.name}")
-    by = collections.defaultdict(list)
-    for lab, other, attrs in adj[nid(x)]:
-        by[lab].append(disp(other) + (" (" + ", ".join(f"{k}={v}" for k, v in attrs.items()) + ")" if attrs else ""))
-    for lab, items in by.items():
-        print(f"  {lab}: " + "; ".join(items))
+    print_by(by_label(adjacency(m), x, "()", " "))
     if isinstance(x, Node):
         below = [e for e in providers(m, x) if all(r["target"] is not x for r in e.rels if r["verb"] in provide_verbs(m))]
         if below:
@@ -298,144 +304,92 @@ def cmd_diff(a, b):
         print("no differences")
 
 
+def cmd_validate(m, rest):
+    errs, warns = validate(m)
+    for x in errs:
+        print("-", x)
+    for w in warns:
+        print("warning:", w)
+    strict = "--strict" in rest
+    if not errs and not (warns and strict):
+        print(f"ok: {len(m.all_nodes())} capabilities, {len(m.entities)} entities, "
+              f"{sum(len(e.rels) for e in m.entities)} relations ({len(warns)} warning(s))")
+    sys.exit(1 if errs or (warns and strict) else 0)
+
+
+def cmd_export(m):
+    print(json.dumps({"version": m.version, "capabilities": [{"id": n.uid, "path": n.path(), "level": n.level(),
+                                        "properties": {p.name: m.resolve(n, p)[0] for p in m.props.values()}} for n in m.all_nodes()],
+                      "entities": [{"id": e.uid, "name": e.name, "type": e.type, "properties": eprops(m, e)} for e in m.entities],
+                      "relations": [{"source": e.name, "relation": r["verb"], "target": target_text(r), **r["attrs"]}
+                                    for e in m.entities for r in e.rels if r["target"]]}, indent=2))
+
+
+def cmd_yaml(m, outdir):
+    import semyaml
+    for p in semyaml.dump(m, facade(), outdir):
+        print("wrote", p)
+
+
+def cmd_gen(m, rest):
+    import gen
+    lv = int(rest[rest.index("--level") + 1]) if "--level" in rest else 3
+    gen.run(facade(), m, rest[0], rest[1], lv)
+
+
+# Commands that run before the model is loaded: name -> (min args, max args or None, handler(rest)).
+EARLY = {
+    "diff": (2, 2, lambda rest: cmd_diff(*rest)),
+    "ids": (0, None, cmd_ids),
+    "version": (0, None, cmd_version),
+}
+
+# Commands on the loaded model: name -> (min args, max args or None, handler(m, rest)).
+# A call whose argument count does not fit prints the usage text, as does a handler raising Usage.
+COMMANDS = {
+    "tree": (0, None, lambda m, r: cmd_tree(m)),
+    "schema": (0, None, lambda m, r: cmd_schema(m)),
+    "show": (1, None, lambda m, r: cmd_show(m, ref(m, r[0]))),
+    "neighbors": (1, None, lambda m, r: cmd_neighbors(m, ref(m, r[0]))),
+    "closure": (2, 2, lambda m, r: cmd_closure(m, ref(m, r[0]), r[1])),
+    "path": (2, 2, lambda m, r: cmd_path(m, ref(m, r[0]), ref(m, r[1]))),
+    "who": (1, None, lambda m, r: cmd_who(m, ref(m, r[0]))),
+    "gaps": (0, None, lambda m, r: cmd_gaps(m)),
+    "coverage": (0, None, lambda m, r: cmd_coverage(m)),
+    "locate": (1, None, lambda m, r: cmd_locate(m, r[0])),
+    "impact": (1, None, lambda m, r: cmd_impact(m, need(m, r[0], "ent"))),
+    "validate": (0, None, cmd_validate),
+    "export": (0, None, lambda m, r: cmd_export(m)),
+    "add": (1, None, edit_add),
+    "set": (2, None, edit_set),
+    "entity": (1, None, edit_entity),
+    "link": (3, None, edit_link),
+    "expose": (2, None, edit_shortcut("expose")),
+    "require": (2, None, edit_shortcut("require")),
+    "unlink": (2, None, edit_unlink),
+    "type": (2, None, edit_type),
+    "relation": (4, None, edit_relation),
+    "yaml": (1, None, lambda m, r: cmd_yaml(m, r[0])),
+    "gen": (2, None, cmd_gen),
+}
+
+
+def fits(spec, rest):
+    lo, hi, _ = spec
+    return len(rest) >= lo and (hi is None or len(rest) <= hi)
+
+
 def main():
     a = sys.argv[1:]
     if not a:
         return print(__doc__)
     cmd, rest = a[0], a[1:]
-    if cmd == "diff" and len(rest) == 2:
-        return cmd_diff(*rest)
-    if cmd == "ids":
-        return cmd_ids(rest)
-    if cmd == "version":
-        return cmd_version(rest)
+    if cmd in EARLY and fits(EARLY[cmd], rest):
+        return EARLY[cmd][2](rest)
     m = load(MODEL)
-    if cmd == "tree":
-        cmd_tree(m)
-    elif cmd == "schema":
-        cmd_schema(m)
-    elif cmd == "show" and rest:
-        cmd_show(m, ref(m, rest[0]))
-    elif cmd == "neighbors" and rest:
-        cmd_neighbors(m, ref(m, rest[0]))
-    elif cmd == "closure" and len(rest) == 2:
-        cmd_closure(m, ref(m, rest[0]), rest[1])
-    elif cmd == "path" and len(rest) == 2:
-        cmd_path(m, ref(m, rest[0]), ref(m, rest[1]))
-    elif cmd == "who" and rest:
-        cmd_who(m, ref(m, rest[0]))
-    elif cmd == "gaps":
-        cmd_gaps(m)
-    elif cmd == "coverage":
-        cmd_coverage(m)
-    elif cmd == "locate" and rest:
-        cmd_locate(m, rest[0])
-    elif cmd == "impact" and rest:
-        cmd_impact(m, need(m, rest[0], "ent"))
-    elif cmd == "validate":
-        errs, warns = validate(m)
-        for x in errs:
-            print("-", x)
-        for w in warns:
-            print("warning:", w)
-        strict = "--strict" in rest
-        if not errs and not (warns and strict):
-            print(f"ok: {len(m.all_nodes())} capabilities, {len(m.entities)} entities, "
-                  f"{sum(len(e.rels) for e in m.entities)} relations ({len(warns)} warning(s))")
-        sys.exit(1 if errs or (warns and strict) else 0)
-    elif cmd == "export":
-        print(json.dumps({"version": m.version, "capabilities": [{"id": n.uid, "path": n.path(), "level": n.level(),
-                                            "properties": {p.name: m.resolve(n, p)[0] for p in m.props.values()}} for n in m.all_nodes()],
-                          "entities": [{"id": e.uid, "name": e.name, "type": e.type, "properties": eprops(m, e)} for e in m.entities],
-                          "relations": [{"source": e.name, "relation": r["verb"], "target": target_text(r), **r["attrs"]}
-                                        for e in m.entities for r in e.rels if r["target"]]}, indent=2))
-    elif cmd == "add" and rest:
-        mk = "-p" in rest
-        rest = [x for x in rest if x != "-p"]
-        parts = [p.strip() for p in rest[0].split("/") if p.strip()]
-        n = m.top
-        for i, part in enumerate(parts):
-            nxt = next((c for c in n.children if c.name.lower() == part.lower()), None)
-            last = i == len(parts) - 1
-            if nxt is None:
-                if not last and not mk:
-                    sys.exit(f"parent '{'/'.join(parts[:i + 1])}' does not exist (use -p to create it)")
-                nxt = Node(part, n)
-                n.children.append(nxt)
-            elif last:
-                sys.exit(f"'{rest[0]}' already exists (use `set` to change it)")
-            n = nxt
-        n.local.update(kv(rest[1:]))
-        commit(m, f"added {n.path()}  ({m.lvname(n)})")
-    elif cmd == "set" and len(rest) >= 2:
-        n = need(m, rest[0], "cap")
-        n.local.update(kv(rest[1:]))
-        commit(m, f"updated {n.path()}")
-    elif cmd == "entity" and rest:
-        sub, args = rest[0], rest[1:]
-        if sub == "list":
-            for e in m.entities:
-                print(f"{e.type:<12} {e.name:<20} {len(e.rels)} relation(s)")
-        elif sub == "add" and len(args) >= 2:
-            if m.entity(args[1]):
-                sys.exit(f"entity '{args[1]}' already exists")
-            e = Entity(args[0], args[1])
-            e.local.update(kv(args[2:]))
-            m.entities.append(e)
-            commit(m, f"added {e.type} {e.name}")
-        elif sub == "set" and len(args) >= 2:
-            e = need(m, args[0], "ent")
-            e.local.update(kv(args[1:]))
-            commit(m, f"updated {e.name}")
-        else:
-            print(__doc__)
-    elif cmd == "link" and len(rest) >= 3:
-        add_link(m, rest[0], rest[1], rest[2], kv(rest[3:]))
-    elif cmd in ("expose", "require") and len(rest) >= 2:
-        add_link(m, rest[0], cmd + "s", rest[1], kv(rest[2:]))
-    elif cmd == "unlink" and len(rest) >= 2:
-        e = need(m, rest[0], "ent")
-        before = len(e.rels)
-        e.rels = [r for r in e.rels if target_text(r).lower() != rest[1].lower() and (r["target"] is None or nid(r["target"]) != nid(ref(m, rest[1])))]
-        if len(e.rels) == before:
-            sys.exit(f"{e.name} has no relation to '{rest[1]}'")
-        commit(m, f"removed {before - len(e.rels)} relation(s) from {e.name}")
-    elif cmd == "type" and len(rest) >= 2:
-        if rest[0] == "add":
-            if rest[1] in m.etypes:
-                sys.exit(f"type '{rest[1]}' already exists")
-            m.etypes[rest[1]] = EType(rest[1], rest[2] if len(rest) > 2 else None)
-            commit(m, f"added entity type {rest[1]}" + (f" : {rest[2]}" if len(rest) > 2 else ""))
-        elif rest[0] == "prop" and len(rest) == 3:
-            t = m.etypes.get(rest[1]) or sys.exit(f"no such type '{rest[1]}'")
-            p = parse_prop(rest[2])
-            t.props[p.name] = p
-            commit(m, f"{t.name} now has property {p.name}")
-        else:
-            print(__doc__)
-    elif cmd == "relation" and rest and rest[0] == "add" and len(rest) >= 4:
-        if rest[1] in m.rtypes:
-            sys.exit(f"relation '{rest[1]}' already exists")
-        rt = RType(rest[1])
-        rt.frm, rt.to = rest[2].split("|"), rest[3].split("|")
-        for x in rest[4:]:
-            if x == "transitive":
-                rt.transitive = True
-            elif x == "no_cycles":
-                rt.no_cycles = True
-            elif x.startswith("inverse="):
-                rt.inverse = x.split("=", 1)[1]
-            else:
-                sys.exit(f"unknown option '{x}'")
-        m.rtypes[rt.name] = rt
-        commit(m, f"added relation {rt.name}: {'|'.join(rt.frm)} -> {'|'.join(rt.to)}")
-    elif cmd == "yaml" and rest:
-        import semyaml
-        for p in semyaml.dump(m, facade(), rest[0]):
-            print("wrote", p)
-    elif cmd == "gen" and len(rest) >= 2:
-        import gen
-        lv = int(rest[rest.index("--level") + 1]) if "--level" in rest else 3
-        gen.run(facade(), m, rest[0], rest[1], lv)
-    else:
-        print(__doc__)
+    if cmd in COMMANDS and fits(COMMANDS[cmd], rest):
+        try:
+            return COMMANDS[cmd][2](m, rest)
+        except Usage:
+            pass
+    print(__doc__)
