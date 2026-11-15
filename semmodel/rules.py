@@ -1,4 +1,4 @@
-import collections, json, os, re, sys
+import collections, os, re, sys
 from semmodel.model import *
 
 
@@ -32,6 +32,27 @@ def unmet(m, excluded=()):
                 if not providers(m, r["target"], set(excluded) | {e.name}, set(rt.satisfied_by)):
                     out.append((e, r, rt))
     return out
+
+
+def dependency(r):
+    return r["attrs"].get("dependency", "hard")
+
+
+def directly_provides(e, n, verbs):
+    """True when entity e has a providing relation straight to capability n."""
+    return any(r["verb"] in verbs and r["target"] is n for r in e.rels)
+
+
+def reach(adj, start, label):
+    """(node, hops) for everything reachable from `start` over edges called `label`, breadth first."""
+    seen, queue = {start}, collections.deque([(start, 0)])
+    while queue:
+        cur, d = queue.popleft()
+        for lab, other, _ in adj[cur]:
+            if lab == label and other not in seen:
+                seen.add(other)
+                queue.append((other, d + 1))
+                yield other, d + 1
 
 
 def cid(n):
@@ -271,15 +292,6 @@ def check_no_cycles(m, errs, warns):
                 dfs(u, [])
 
 
-def check_ids(m, errs, warns):
-    if getattr(m, "yaml", False):
-        validate_ids(m, errs, warns)
-
-
-def dependency(r):
-    return r["attrs"].get("dependency", "hard")
-
-
 def check_unmet(m, errs, warns):
     for e, r, rt in unmet(m):
         sev = dependency(r)
@@ -287,19 +299,10 @@ def check_unmet(m, errs, warns):
         (errs if m.rules.get("unmet_requirements") == "error" and sev == "hard" else warns).append(msg)
 
 
-RULES = [check_entity_types, check_ref_targets, check_keys, check_relation_types, check_capabilities,
-         check_entities, check_no_cycles, check_ids, check_unmet]
-
-
-def validate(m):
-    errs, warns = list(getattr(m, "load_errors", [])), []
-    for rule in RULES:
-        rule(m, errs, warns)
-    return errs, warns
-
-
 def validate_ids(m, errs, warns):
-    """Model version and universal ids: every capability and entity should carry a unique UUID `id`."""
+    """YAML models: a MAJOR.MINOR.PATCH version, and a unique UUID `id` on every capability and entity."""
+    if not getattr(m, "yaml", False):
+        return
     if m.version is None:
         warns.append(f"{m.entry}: no model version (add `version: 1.0.0`, or run: python sem.py version 1.0.0)")
     elif not SEMVER_RE.match(m.version):
@@ -317,6 +320,17 @@ def validate_ids(m, errs, warns):
     for f, k in missing.items():
         warns.append(f"{f}: {k} capabilit{'y' if k == 1 else 'ies'}/entit{'y' if k == 1 else 'ies'} without an id "
                      "(run: python sem.py ids)")
+
+
+RULES = [check_entity_types, check_ref_targets, check_keys, check_relation_types, check_capabilities,
+         check_entities, check_no_cycles, validate_ids, check_unmet]
+
+
+def validate(m):
+    errs, warns = list(getattr(m, "load_errors", [])), []
+    for rule in RULES:
+        rule(m, errs, warns)
+    return errs, warns
 
 
 def norm_uid(s):
@@ -349,7 +363,7 @@ def id_line(m, x):
     return None
 
 
-def describe(m, x):
+def describe(x):
     return (f"capability L{x.level()} {x.path()}" if isinstance(x, Node) else f"entity ({x.type}) {x.name}")
 
 
@@ -400,14 +414,7 @@ def impact(m, e):
     adj, dependents = adjacency(m), []
     for rt in m.rtypes.values():
         if rt.transitive and rt.inverse:
-            seen, queue, out = {eid(e)}, collections.deque([(eid(e), 0)]), []
-            while queue:
-                cur, d = queue.popleft()
-                for lab, other, _ in adj[cur]:
-                    if lab == rt.inverse and other not in seen:
-                        seen.add(other)
-                        queue.append((other, d + 1))
-                        out.append((other, d + 1))
+            out = list(reach(adj, eid(e), rt.inverse))
             if out:
                 dependents.append((rt, out))
     referenced = [(x, p) for x, p, t in refs(m) if t is e]

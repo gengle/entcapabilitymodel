@@ -1,4 +1,4 @@
-import collections, json, os, re, sys
+import os, re
 
 MODEL = os.environ.get("SEM_MODEL") or ("model" if os.path.isdir("model") else "model.sem")
 PROP_RE = re.compile(r'^(\w+):\s*(\w+)(?:\(([^)]*)\))?(?:\s*=\s*("[^"]*"|\S+))?((?:\s+(?:inherit|required|key))*)\s*$')
@@ -10,6 +10,10 @@ SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 def unq(v):
     v = v.strip()
     return v[1:-1] if len(v) >= 2 and v[0] == v[-1] == '"' else v
+
+
+def slug(s):
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
 def fmt(v):
@@ -214,9 +218,3 @@ class Model:
 def target_text(r):
     t = r["target"]
     return t.path() if isinstance(t, Node) else (t.name if t is not None else r["text"])
-
-
-def facade():
-    """The `sem` facade module, which semyaml.load and gen.run receive as S."""
-    import sem
-    return sem

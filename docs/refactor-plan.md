@@ -71,3 +71,10 @@ directly, move the helpers still duplicated across files into one place, update 
 - `validate` and `main` no longer exceed ~40 lines; no function over ~60 lines without a reason noted.
 - Total Python lines noticeably below 2,475 with the same features.
 - `CLAUDE.md` architecture notes describe the new layout.
+
+## Result (phase 3)
+
+- The `S` (sem module) parameters and `semmodel.model.facade()` are gone: `semyaml.load(path, overrides=None)`, `gen.run(m, kind, outdir, level)`, `gen_x(m, out, level)`. `sem.py` is a 6-line entry point; `server.py` imports `semmodel.rules` / `semmodel.model` directly.
+- One home per helper: `slug` (model), `bump` (semyaml, next to `read_version`/`write_version`), `dependency`, `directly_provides`, `reach` (rules; the closure command and `impact` shared a BFS), `yaml_files` (semyaml; the server used a copy), `_after`/`_new_line` merged, `validate_ids` registered directly as a rule.
+- Python lines 2,880 -> about 2,820 (2,475 before the whole refactor). The remaining code has little duplication left; reaching ~2,300 would need dropping the two-blank-lines-between-top-level-definitions convention (about 200 lines) or features.
+- Golden check IDENTICAL after every step. `tools` that called `semyaml.load(path, sem)` must drop the second argument.

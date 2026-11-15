@@ -21,6 +21,7 @@ Entity types and relation types also take `description`. These become Prop.descr
 """
 import copy, glob, os, re
 import yaml
+from semmodel.model import Model, Prop, EType, RType, Node, Entity, SEMVER_RE, parse_prop, slug, target_text
 
 KEYS = {"Model": {"include", "name", "description", "version"},
         "Schema": {"include", "root", "levels", "props", "rules", "entity_types", "relations"},
@@ -49,11 +50,6 @@ def _opt(v, f=sval):
 
 def _text(v):
     return _opt(v, lambda x: str(x).strip())
-
-
-def _unknown(d, allowed):
-    """Keys of d outside `allowed`."""
-    return set(d) - allowed
 
 
 # ------------------------------------------------------------------ include merging
@@ -183,25 +179,25 @@ class Loader:
 
 
 # ------------------------------------------------------------------ loading
-def load(path, S, overrides=None):
-    """Load a YAML model from a folder (its model.yaml) or an entry file. S is the sem module."""
+def load(path, overrides=None):
+    """Load a YAML model from a folder (its model.yaml) or an entry file."""
     path = os.path.abspath(path)
     root, entry = (path, os.path.join(path, "model.yaml")) if os.path.isdir(path) else (os.path.dirname(path), path)
     L = Loader(root, overrides)
     if L.read(entry) is not None and L.raw[entry].get("kind") != "Model":
         L.err(entry, "the entry file must have kind: Model")
     L.visit(entry)
-    m = S.Model()
+    m = Model()
     m.yaml, m.src_root, m.entry, m.files, m.load_errors = True, root, L.rel(entry), L.files, L.errors
     m.top.src, m.top.prop_src = None, {}
-    caps = _load_docs(m, S, L)
-    _attach_caps(m, S, caps, L.errors)
+    caps = _load_docs(m, L)
+    _attach_caps(m, caps, L.errors)
     L.errors[:] = dict.fromkeys(L.errors)
     m.link()
     return m
 
 
-def _load_docs(m, S, L):
+def _load_docs(m, L):
     """Apply every document by kind; Capability documents are returned for later, since they may name a parent."""
     caps = []
     for f, d, prov in L.docs:
@@ -209,21 +205,21 @@ def _load_docs(m, S, L):
         if kind not in KEYS:
             L.errors.append(f"{f}: unknown kind '{kind}' (use {', '.join(KEYS)})")
             continue
-        extra = _unknown(d, KEYS[kind] | {"kind"})
+        extra = set(d) - KEYS[kind] - {"kind"}
         if extra:
             L.errors.append(f"{f}: unknown key(s) for {kind}: {', '.join(sorted(extra))}")
         if kind == "Model" and f == m.entry:
             m.name, m.version = _opt(d.get("name")), _opt(d.get("version"))
         elif kind == "Schema":
-            schema(m, S, f, d, L.errors)
+            schema(m, f, d, L.errors)
         elif kind == "Capability":
             caps.append((f, d, prov))
         elif kind == "Entity":
-            entity(m, S, f, d, prov, L.errors)
+            entity(m, f, d, prov, L.errors)
     return caps
 
 
-def _attach_caps(m, S, caps, errors):
+def _attach_caps(m, caps, errors):
     """Attach capability documents under their `parent:` (or the root), retrying until none more can be placed."""
     while caps:
         later = []
@@ -232,23 +228,23 @@ def _attach_caps(m, S, caps, errors):
             if parent is None:
                 later.append((f, d, prov))
             else:
-                capability(m, S, parent, f, d, prov, (), errors)
+                capability(parent, f, d, prov, (), errors)
         if len(later) == len(caps):
             errors += [f"{f}: parent capability '{d['parent']}' not found" for f, d, _ in later]
             break
         caps = later
 
 
-def prop(S, name, spec):
+def prop(name, spec):
     """A property from its .sem syntax string, or from a mapping that can also document it:
     {type, values, default, inherit, required, description}, where `values` is a list or a mapping of value -> meaning."""
     if isinstance(spec, str):
-        return S.parse_prop(f"{name}: {spec}")
+        return parse_prop(f"{name}: {spec}")
     spec = spec or {}
     bad = lambda msg: ValueError(f"property {name}: {msg}")
     if not isinstance(spec, dict):
         raise bad("expected a spec string or a mapping")
-    for k in _unknown(spec, PROP_KEYS):
+    for k in set(spec) - PROP_KEYS:
         raise bad(f"unknown setting '{k}'")
     typ = str(spec.get("type", "string"))
     if typ not in PROP_TYPES:
@@ -262,7 +258,7 @@ def prop(S, name, spec):
     dflt = _opt(spec.get("default"))
     if dflt is not None and vals and dflt not in vals:
         raise bad(f"default '{dflt}' is not one of its values")
-    p = S.Prop(name, typ, vals, dflt, bool(spec.get("inherit")), bool(spec.get("required")), targets or None, bool(spec.get("key")))
+    p = Prop(name, typ, vals, dflt, bool(spec.get("inherit")), bool(spec.get("required")), targets or None, bool(spec.get("key")))
     if spec.get("description") is not None:
         p.description = str(spec["description"]).strip()
     p.docs = {k: v for k, v in docs.items() if v}
@@ -277,50 +273,50 @@ def _prop_values(raw):
     return names(raw) or None, {}
 
 
-def props(S, f, specs, errors, where):
+def props(f, specs, errors, where):
     out = {}
     if specs is not None and not isinstance(specs, dict):
         errors.append(f"{f}: {where} props must be a mapping")
         return out
     for name, spec in (specs or {}).items():
         try:
-            out[name] = prop(S, name, spec)
+            out[name] = prop(name, spec)
         except ValueError as x:
             errors.append(f"{f}: {where}: {x}")
     return out
 
 
-def schema(m, S, f, d, errors):
+def schema(m, f, d, errors):
     if "root" in d:
         m.root_name = str(d["root"])
     for k, v in (d.get("levels") or {}).items():
         m.levels[int(k)] = str(v)
-    m.props.update(props(S, f, d.get("props"), errors, m.root_name))
+    m.props.update(props(f, d.get("props"), errors, m.root_name))
     for k, v in (d.get("rules") or {}).items():
         m.rules[k] = "" if v is None or v is True else sval(v)
     for name, spec in (d.get("entity_types") or {}).items():
         spec = spec or {}
         if name in m.etypes:
             errors.append(f"{f}: entity type '{name}' is defined twice")
-        errors += [f"{f}: entity type {name}: unknown setting '{k}'" for k in _unknown(spec, ETYPE_KEYS)]
-        et = S.EType(str(name), spec.get("extends"))
+        errors += [f"{f}: entity type {name}: unknown setting '{k}'" for k in set(spec) - ETYPE_KEYS]
+        et = EType(str(name), spec.get("extends"))
         et.description = _text(spec.get("description"))
-        et.props = props(S, f, spec.get("props"), errors, f"entity type {name}")
+        et.props = props(f, spec.get("props"), errors, f"entity type {name}")
         m.etypes[et.name] = et
     for name, spec in (d.get("relations") or {}).items():
         spec = spec or {}
         if name in m.rtypes:
             errors.append(f"{f}: relation '{name}' is defined twice")
-        errors += [f"{f}: relation {name}: unknown setting '{k}'" for k in _unknown(spec, RTYPE_KEYS)]
-        rt = _rtype(S, f, str(name), spec, errors)
+        errors += [f"{f}: relation {name}: unknown setting '{k}'" for k in set(spec) - RTYPE_KEYS]
+        rt = _rtype(f, str(name), spec, errors)
         m.rtypes[rt.name] = rt
 
 
-def _rtype(S, f, name, spec, errors):
-    rt = S.RType(name)
+def _rtype(f, name, spec, errors):
+    rt = RType(name)
     rt.description = _text(spec.get("description"))
     rt.frm, rt.to = names(spec.get("from")), names(spec.get("to"))
-    rt.attrs = props(S, f, spec.get("attrs"), errors, f"relation {name}")
+    rt.attrs = props(f, spec.get("attrs"), errors, f"relation {name}")
     rt.inverse = spec.get("inverse")
     rt.min_level = _opt(spec.get("min_level"), int)
     rt.satisfied_by, rt.conflicts = names(spec.get("satisfied_by")), names(spec.get("conflicts_with"))
@@ -335,11 +331,11 @@ def _load_props(obj, d, prov, base, f):
             obj.local[k], obj.prop_src[k] = sval(v), prov.get(base + ("props", k), f)
 
 
-def capability(m, S, parent, f, d, prov, path, errors):
+def capability(parent, f, d, prov, path, errors):
     if not d.get("name"):
         errors.append(f"{prov.get(path, f) if path else f}: capability without a name")
         return
-    n = S.Node(str(d["name"]), parent)
+    n = Node(str(d["name"]), parent)
     n.src, n.prop_src = prov.get(path + ("name",), f), {}
     n.uid = _opt(d.get("id"))
     parent.children.append(n)
@@ -348,15 +344,15 @@ def capability(m, S, parent, f, d, prov, path, errors):
         if not isinstance(c, dict):
             errors.append(f"{n.src}: {n.path()}: children must be mappings with a name")
             continue
-        errors += [f"{n.src}: {n.path()}/{c.get('name')}: unknown key '{k}'" for k in _unknown(c, CHILD_KEYS)]
-        capability(m, S, n, f, c, prov, path + ("children", i), errors)
+        errors += [f"{n.src}: {n.path()}/{c.get('name')}: unknown key '{k}'" for k in set(c) - CHILD_KEYS]
+        capability(n, f, c, prov, path + ("children", i), errors)
 
 
-def entity(m, S, f, d, prov, errors):
+def entity(m, f, d, prov, errors):
     if not d.get("type") or not d.get("name"):
         errors.append(f"{f}: an Entity needs both type and name")
         return
-    e = S.Entity(str(d["type"]), str(d["name"]))
+    e = Entity(str(d["type"]), str(d["name"]))
     e.src, e.prop_src = f, {}
     e.uid = _opt(d.get("id"))
     _load_props(e, d, prov, (), f)
@@ -379,10 +375,6 @@ def entity(m, S, f, d, prov, errors):
 
 
 # ------------------------------------------------------------------ writing
-def slug(s):
-    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
-
-
 def _clean(pairs):
     """A mapping of the (key, value) pairs whose value is not None."""
     return {k: v for k, v in pairs if v is not None}
@@ -390,12 +382,12 @@ def _clean(pairs):
 
 def spec(p):
     """The .sem syntax string, or the mapping form when the property carries descriptions."""
-    if not (getattr(p, "description", None) or getattr(p, "docs", None)):
+    if not (p.description or p.docs):
         return p.line().split(":", 1)[1].strip()
     return _clean((
         ("type", p.type), ("description", p.description), ("to", list(p.targets) or None),
         ("values", {x: p.docs.get(x) for x in p.enum} if p.enum else None), ("default", typed(p, p.default)),
-        ("inherit", p.inherit or None), ("required", p.required or None), ("key", getattr(p, "key", False) or None)))
+        ("inherit", p.inherit or None), ("required", p.required or None), ("key", p.key or None)))
 
 
 def typed(p, v):
@@ -414,10 +406,10 @@ def _specs(defs):
 
 
 def _schema_doc(m):
-    etypes = {t.name: _clean((("description", getattr(t, "description", None) or None), ("extends", t.parent or None),
+    etypes = {t.name: _clean((("description", t.description or None), ("extends", t.parent or None),
                               ("props", _specs(t.props) if t.props else None))) or None for t in m.etypes.values()}
     rels = {r.name: _clean((
-        ("description", getattr(r, "description", None)), ("from", r.frm), ("to", r.to), ("attrs", _specs(r.attrs) or None),
+        ("description", r.description), ("from", r.frm), ("to", r.to), ("attrs", _specs(r.attrs) or None),
         ("inverse", r.inverse), ("min_level", r.min_level), ("satisfied_by", r.satisfied_by or None),
         ("conflicts_with", r.conflicts or None), ("transitive", r.transitive or None), ("no_cycles", r.no_cycles or None)))
         for r in m.rtypes.values()}
@@ -426,7 +418,7 @@ def _schema_doc(m):
 
 
 def _cap_doc(m, n):
-    d = {"name": n.name, **({"id": n.uid} if getattr(n, "uid", None) else {})}
+    d = {"name": n.name, **({"id": n.uid} if n.uid else {})}
     if n.local:
         d["props"] = {k: typed(m.props.get(k), v) for k, v in n.local.items()}
     if n.children:
@@ -434,29 +426,29 @@ def _cap_doc(m, n):
     return d
 
 
-def _entity_doc(m, S, e):
+def _entity_doc(m, e):
     defs = m.eprop_defs(e.type) if e.type in m.etypes else {}
-    d = {"kind": "Entity", "type": e.type, "name": e.name, **({"id": e.uid} if getattr(e, "uid", None) else {})}
+    d = {"kind": "Entity", "type": e.type, "name": e.name, **({"id": e.uid} if e.uid else {})}
     if e.local:
         d["props"] = {k: typed(defs.get(k), v) for k, v in e.local.items()}
     rels = {}
     for r in e.rels:
-        t = S.target_text(r)
+        t = target_text(r)
         rels.setdefault(r["verb"], []).append({"target": t, **r["attrs"]} if r["attrs"] else t)
     if rels:
         d["relations"] = rels
     return d
 
 
-def dump(m, S, outdir):
+def dump(m, outdir):
     """Write m as a YAML source tree: model.yaml, schema.yaml, capabilities/<L1>.yaml, entities/<name>.yaml."""
     at = lambda *p: os.path.join(outdir, *p)
-    head = {"kind": "Model", **({"name": m.name} if getattr(m, "name", None) else {}),
-            **({"version": m.version} if getattr(m, "version", None) else {})}
+    head = {"kind": "Model", **({"name": m.name} if m.name else {}),
+            **({"version": m.version} if m.version else {})}
     out = [write(at("model.yaml"), {**head, "include": ["schema.yaml", "capabilities/*.yaml", "entities/*.yaml"]}),
            write(at("schema.yaml"), _schema_doc(m))]
     out += [write(at("capabilities", slug(top.name) + ".yaml"), {"kind": "Capability", **_cap_doc(m, top)}) for top in m.top.children]
-    out += [write(at("entities", slug(e.name) + ".yaml"), _entity_doc(m, S, e)) for e in m.entities]
+    out += [write(at("entities", slug(e.name) + ".yaml"), _entity_doc(m, e)) for e in m.entities]
     return out
 
 
@@ -476,13 +468,6 @@ def _eol(line):
     return "\r\n" if line.endswith("\r\n") else "\n"
 
 
-def _after(lines, key_node, val_node, text):
-    """(index, indent, eol) for a new sibling line after `key: value` (the value may run over several lines)."""
-    end = val_node.end_mark
-    last = end.line if end.column > 0 else end.line - 1
-    return max(last, key_node.start_mark.line) + 1, " " * key_node.start_mark.column, _eol(lines[key_node.start_mark.line])
-
-
 def _get(mapping, key):
     for k, v in mapping.value:
         if isinstance(k, yaml.ScalarNode) and k.value == key:
@@ -496,13 +481,16 @@ def _scalar(mapping, key):
     return v.value if isinstance(v, yaml.ScalarNode) else None
 
 
-def _new_line(lines, text, k, v, make):
-    """(index, line) of a new sibling line after `k: v`; make(indent) is its text without the line ending."""
-    at, indent, eol = _after(lines, k, v, text)
-    return at, make(indent) + eol
+def _new_line(lines, k, v, make):
+    """(index, line) of a new sibling line after `k: v` (the value may run over several lines);
+    make(indent) is its text without the line ending."""
+    end = v.end_mark
+    last = end.line if end.column > 0 else end.line - 1
+    row = k.start_mark.line
+    return max(last, row) + 1, make(" " * k.start_mark.column) + _eol(lines[row])
 
 
-def _yaml_files(root):
+def yaml_files(root):
     """(path, relative path) of every .yaml/.yml file under root in sorted order, skipping dot folders."""
     for d, dirs, files in os.walk(root):
         dirs[:] = sorted(x for x in dirs if not x.startswith("."))
@@ -535,7 +523,7 @@ def assign_ids(root, dry_run=False, new_id=None):
     import uuid
     new_id = new_id or (lambda: str(uuid.uuid4()))
     root, done = os.path.abspath(root), []
-    for path, rel in _yaml_files(root):
+    for path, rel in yaml_files(root):
         text, lines = _lines(path)
         try:
             doc = yaml.compose(text)
@@ -550,7 +538,7 @@ def assign_ids(root, dry_run=False, new_id=None):
             if k is None or not isinstance(v, yaml.ScalarNode) or _get(node, "id")[0] is not None or node.flow_style:
                 continue
             uid = new_id()
-            inserts.append(_new_line(lines, text, k, v, lambda indent, uid=uid: f"{indent}id: {uid}"))
+            inserts.append(_new_line(lines, k, v, lambda indent, uid=uid: f"{indent}id: {uid}"))
             done.append((rel, label + v.value, uid))
         if inserts and not dry_run:
             if lines and not lines[-1].endswith(("\n", "\r")):
@@ -564,6 +552,18 @@ def assign_ids(root, dry_run=False, new_id=None):
 def read_version(root):
     data = yaml.safe_load(open(os.path.join(root, "model.yaml"), encoding="utf-8")) or {}
     return _opt(data.get("version"))
+
+
+def bump(old, how):
+    """The version after `how` (major | minor | patch | an explicit x.y.z); ValueError if that is not possible."""
+    if how in ("major", "minor", "patch"):
+        if not old or not SEMVER_RE.match(old):
+            raise ValueError(f"cannot bump '{old}'; set a version first (e.g. 1.0.0)")
+        x, y, z = (int(v) for v in re.match(r"(\d+)\.(\d+)\.(\d+)", old).groups())
+        return {"major": f"{x + 1}.0.0", "minor": f"{x}.{y + 1}.0", "patch": f"{x}.{y}.{z + 1}"}[how]
+    if not SEMVER_RE.match(how):
+        raise ValueError(f"'{how}' is not MAJOR.MINOR.PATCH (or major / minor / patch)")
+    return how
 
 
 def write_version(root, version):
@@ -580,6 +580,6 @@ def write_version(root, version):
         k, v = _get(doc, "name")
         if k is None:
             k, v = _get(doc, "kind")
-        at, line = _new_line(lines, text, k, v, lambda _: f"version: {version}")
+        at, line = _new_line(lines, k, v, lambda _: f"version: {version}")
         lines.insert(at, line)
     _save(path, lines)

@@ -1,4 +1,4 @@
-# Dynamic semantic model (sem.py + semyaml.py + gen.py + server.py)
+# Dynamic semantic model (sem.py + semmodel/ + semyaml.py + gen.py + server.py)
 The model lives in `model/` as YAML and is the single source of truth. It defines capability levels/props, entity types (is-a),
 relation types (domain/range, attrs, inverse, min_level, satisfied_by, conflicts_with, transitive, no_cycles), the capability
 tree, and one file per entity. Generators read the model, so schema changes flow through. Needs Python 3 with PyYAML.
@@ -59,5 +59,5 @@ take a list of choices (e.g. `review_cycle_days` offers 30/60/90/180/365). The c
 nothing includes, so it never affects the model or its validation. For frontend work run
 `python server.py` and `npm run dev` in `web/` (http://localhost:5173, proxies /api).
 
-Notes: TypeQL output is an untested draft. The model-level rules (min_level, cycles, satisfied_by) live in sem.py; SQL views
+Notes: TypeQL output is an untested draft. The model-level rules (min_level, cycles, satisfied_by) live in semmodel/rules.py; SQL views
 reproduce unmet/coverage/closure, but generated JSON Schema/TypeQL do not enforce them.

@@ -1,17 +1,16 @@
 """Generators: every output is derived from the model, so adding a type/relation/entity changes them all.
 
-Add a generator by writing gen_x(S, m, out, level) and registering it in GENS."""
+Add a generator by writing gen_x(m, out, level) and registering it in GENS."""
 import csv, html, json, os, re
+from semmodel.model import Node, slug, target_text
+from semmodel.rules import (adjacency, cid, edges, eid, eprops, nid, provide_min_level, provide_verbs,
+                            providers, unmet, validate)
 
 # ---------------------------------------------------------------- shared helpers
 # prop type -> target type (anything not listed is a string)
 JSON_TYPES = {"int": "integer"}
 SQL_TYPES = {"int": "INTEGER"}
 TQL_TYPES = {"int": "integer"}
-
-
-def slug(s):
-    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
 def w(outdir, name, text):
@@ -44,17 +43,11 @@ def desc(x):
 
 def vdocs(p):
     """Enum value -> meaning, in the enum's declared order, documented values only."""
-    d = getattr(p, "docs", None) or {}
-    return {v: d[v] for v in (p.enum or []) if d.get(v)}
+    return {v: p.docs[v] for v in (p.enum or []) if p.docs.get(v)}
 
 
 def vdoc(p, v):
-    return (getattr(p, "docs", None) or {}).get(str(v)) if v is not None else None
-
-
-def cap_cols(m):
-    """The per-capability property columns: (name, Prop)."""
-    return list(m.props.items())
+    return p.docs.get(str(v)) if v is not None else None
 
 
 def cap_values(m, n):
@@ -111,8 +104,8 @@ def table(head, rows):
 class Site:
     """Static HTML site; one method per page family."""
 
-    def __init__(self, S, m, out):
-        self.S, self.m, self.out, self.adj = S, m, out, S.adjacency(m)
+    def __init__(self, m, out):
+        self.m, self.out, self.adj = m, out, adjacency(m)
 
     def write(self, name, title, body, depth=0):
         pre = "../" * depth
@@ -143,7 +136,7 @@ class Site:
     def value(self, p, v, depth=1):
         mean = vdoc(p, v) if p is not None else None
         t = self.m.ref(p, v) if getattr(p, "type", None) == "ref" else None  # ref props link to the entity they name
-        shown = (f"<a href='{self.href(self.S.eid(t), depth)}'>{E(t.name)}</a>"
+        shown = (f"<a href='{self.href(eid(t), depth)}'>{E(t.name)}</a>"
                  + (f" <span class=muted>({E(str(v))})</span>" if t.name.lower() != str(v).lower() else "")) if t else E(str(v))
         return shown + (f"<div class=muted>{E(mean)}</div>" if mean else "")
 
@@ -189,7 +182,7 @@ class Site:
         self.write("index.html", f"{self.m.root_name} map", idx)
 
     def cap_page(self, n):
-        S, m = self.S, self.m
+        m = self.m
         rows = "".join(f"<tr><td>{self.field(p)}</td><td>{self.value(p, v)}</td><td class=muted>{E(o)}</td></tr>"
                        for p in m.props.values() for v, o in [m.resolve(n, p)])
         anc, a = [], n.parent
@@ -198,35 +191,35 @@ class Site:
             a = a.parent
         crumbs = " / ".join(f"<a href='{slug(x.path())}.html'>{E(x.name)}</a>" for x in reversed(anc))
         kids = "".join(f"<li><a href='{slug(c.path())}.html'>{E(c.name)}</a></li>" for c in n.children)
-        provs = ", ".join(f"<a href='../ent/{slug(e.name)}.html'>{E(e.name)}</a>" for e in S.providers(m, n)) or "<span class='pill bad'>white space</span>"
+        provs = ", ".join(f"<a href='../ent/{slug(e.name)}.html'>{E(e.name)}</a>" for e in providers(m, n)) or "<span class='pill bad'>white space</span>"
         extra = ((f"<h2>Sub-capabilities</h2><ul>{kids}</ul>" if kids else "")
                  + f"<h2>Provided by (including sub-capabilities)</h2><p>{provs}</p>")
         sub = E(m.lvname(n)) + (' · ' + crumbs if crumbs else '')
-        self.write(f"cap/{slug(n.path())}.html", n.name, self.detail(sub, rows, S.cid(n), extra), 1)
+        self.write(f"cap/{slug(n.path())}.html", n.name, self.detail(sub, rows, cid(n), extra), 1)
 
     def ent_page(self, e):
-        S, m = self.S, self.m
+        m = self.m
         pd = m.eprop_defs(e.type)
-        rows = "".join(f"<tr><td>{self.field(pd[k])}</td><td>{self.value(pd[k], v)}</td></tr>" for k, v in S.eprops(m, e).items())
+        rows = "".join(f"<tr><td>{self.field(pd[k])}</td><td>{self.value(pd[k], v)}</td></tr>" for k, v in eprops(m, e).items())
         td = desc(m.etypes.get(e.type))
         sub = f"{E(e.type)} · is-a {E(' > '.join(m.chain(e.type)))}{(' · ' + E(td)) if td else ''}"
-        self.write(f"ent/{slug(e.name)}.html", e.name, self.detail(sub, rows, S.eid(e)), 1)
+        self.write(f"ent/{slug(e.name)}.html", e.name, self.detail(sub, rows, eid(e)), 1)
 
     def entities(self):
         rows = "".join(f"<tr><td><a href='ent/{slug(e.name)}.html'>{E(e.name)}</a></td><td>{E(e.type)}</td><td>{len(e.rels)}</td></tr>" for e in self.m.entities)
         self.write("entities.html", "Entities", table("<th>Name<th>Type<th>Relations", rows))
 
     def coverage(self):
-        S, m = self.S, self.m
-        min_lv, rows = S.provide_min_level(m), ""
+        m = self.m
+        min_lv, rows = provide_min_level(m), ""
         for n in (x for x in m.all_nodes() if x.level() >= min_lv):
-            pr = S.providers(m, n)
+            pr = providers(m, n)
             rows += (f"<tr class={'bad' if not pr else ''}><td>{'&nbsp;' * 4 * (n.level() - min_lv)}<a href='cap/{slug(n.path())}.html'>{E(n.name)}</a></td>"
                      f"<td>L{n.level()}</td><td>{len(pr)}</td><td>{E(', '.join(e.name for e in pr)) or 'white space'}</td></tr>")
         self.write("coverage.html", "Coverage", table("<th>Capability<th>Level<th>#<th>Providers", rows))
 
     def gaps(self):
-        g = self.S.unmet(self.m)
+        g = unmet(self.m)
         rows = "".join(f"<tr class=warn><td><a href='ent/{slug(e.name)}.html'>{E(e.name)}</a></td><td>{E(rt.name)}</td>"
                        f"<td><a href='cap/{slug(r['target'].path())}.html'>{E(r['target'].name)}</a></td><td>{E(r['attrs'].get('dependency', ''))}</td></tr>" for e, r, rt in g)
         self.write("gaps.html", "Unmet requirements", table("<th>Entity<th>Relation<th>Capability<th>Severity", rows) if g else "<p>None.</p>")
@@ -248,13 +241,13 @@ class Site:
                    f"<h2>Entity type fields</h2>{tf}" + (f"<h2>Relation attributes</h2>{rf}" if rf else ""))
 
     def graph(self):
-        ed = self.S.edges(self.m)
+        ed = edges(self.m)
         w(self.out, "graph.json", json.dumps({"nodes": sorted({i for e in ed for i in e[:3:2]}),
                                               "edges": [{"s": s, "rel": l, "d": d, "attrs": a} for s, l, d, a, _ in ed]}, indent=1))
 
 
-def gen_site(S, m, out, level):
-    s = Site(S, m, out)
+def gen_site(m, out, level):
+    s = Site(m, out)
     s.index()
     for n in m.all_nodes():
         s.cap_page(n)
@@ -281,7 +274,7 @@ SQL_TABLES = [
 
 
 def sql_tables(m):
-    cols = cap_cols(m)
+    cols = list(m.props.items())
     # SQLite has no COMMENT ON: column meanings go in comments here and, queryable, in property/property_value below.
     L = [f"-- capability.{c}: {' '.join(desc(p).split())}" for c, p in cols if desc(p)]
     L.append("CREATE TABLE capability(id INTEGER PRIMARY KEY, uid TEXT UNIQUE, path TEXT UNIQUE NOT NULL, name TEXT NOT NULL, parent_id INTEGER REFERENCES capability(id), level INTEGER NOT NULL"
@@ -289,7 +282,7 @@ def sql_tables(m):
     return L + SQL_TABLES
 
 
-def sql_inserts(S, m, ids, eids):
+def sql_inserts(m, ids, eids):
     L = []
     for n in m.all_nodes():
         L.append(f"INSERT INTO capability VALUES({ids[n]},{sqlq(n.uid)},{sqlq(n.path())},{sqlq(n.name)},{ids[n.parent] if n.parent in ids else 'NULL'},{n.level()}"
@@ -297,7 +290,7 @@ def sql_inserts(S, m, ids, eids):
     for t in m.etypes.values():
         L.append(f"INSERT INTO entity_type VALUES({sqlq(t.name)},{sqlq(t.parent)},{sqlq(desc(t))});")
     for e in m.entities:
-        L.append(f"INSERT INTO entity VALUES({eids[e.name]},{sqlq(e.uid)},{sqlq(e.name)},{sqlq(e.type)},{sqlq(jq(S.eprops(m, e)))});")
+        L.append(f"INSERT INTO entity VALUES({eids[e.name]},{sqlq(e.uid)},{sqlq(e.name)},{sqlq(e.type)},{sqlq(jq(eprops(m, e)))});")
     for r in m.rtypes.values():
         L.append(f"INSERT INTO relation_type VALUES({sqlq(r.name)},{sqlq(r.inverse)},{sqlq('|'.join(r.frm))},{sqlq('|'.join(r.to))},{int(r.transitive)},{r.min_level or 'NULL'},{sqlq(desc(r))});")
     for kind, owner, props in owners(m):
@@ -310,12 +303,12 @@ def sql_inserts(S, m, ids, eids):
             t = r["target"]
             if t is None:
                 continue
-            cap, ent = (ids[t], "NULL") if isinstance(t, S.Node) else ("NULL", eids[t.name])
+            cap, ent = (ids[t], "NULL") if isinstance(t, Node) else ("NULL", eids[t.name])
             L.append(f"INSERT INTO link(src,relation,cap_id,ent_id,attrs) VALUES({eids[e.name]},{sqlq(r['verb'])},{cap},{ent},{sqlq(jq(r['attrs']))});")
     return L
 
 
-def sql_views(S, m):
+def sql_views(m):
     L = ["CREATE VIEW entity_active AS SELECT * FROM entity WHERE COALESCE(json_extract(props,'$.lifecycle'),'active')<>'retire';"]
     for rt in m.rtypes.values():
         if rt.satisfied_by:
@@ -324,11 +317,11 @@ def sql_views(S, m):
                      f"  FROM link l JOIN entity_active e ON e.id=l.src JOIN capability c ON c.id=l.cap_id WHERE l.relation={sqlq(rt.name)} AND NOT EXISTS (\n"
                      f"    SELECT 1 FROM link p JOIN entity_active pe ON pe.id=p.src JOIN capability pc ON pc.id=p.cap_id\n"
                      f"    WHERE p.relation IN ({vs}) AND pe.id<>l.src AND (pc.path=c.path OR pc.path LIKE c.path||'/%'));")
-    prov = sorted(S.provide_verbs(m))
+    prov = sorted(provide_verbs(m))
     if prov:
         vs = ",".join(sqlq(v) for v in prov)
         L.append(f"CREATE VIEW coverage AS SELECT c.path, c.level, (SELECT COUNT(DISTINCT p.src) FROM link p JOIN entity_active pe ON pe.id=p.src JOIN capability pc ON pc.id=p.cap_id\n"
-                 f"  WHERE p.relation IN ({vs}) AND (pc.path=c.path OR pc.path LIKE c.path||'/%')) AS providers FROM capability c WHERE c.level>={S.provide_min_level(m)};")
+                 f"  WHERE p.relation IN ({vs}) AND (pc.path=c.path OR pc.path LIKE c.path||'/%')) AS providers FROM capability c WHERE c.level>={provide_min_level(m)};")
     for rt in m.rtypes.values():
         if rt.transitive:
             L.append(f"CREATE VIEW {pyname(rt.name)}_closure AS WITH RECURSIVE r(src,dst) AS (SELECT src,ent_id FROM link WHERE relation={sqlq(rt.name)} AND ent_id IS NOT NULL\n"
@@ -337,11 +330,11 @@ def sql_views(S, m):
     return L
 
 
-def gen_sql(S, m, out, level):
+def gen_sql(m, out, level):
     ids = {n: i + 1 for i, n in enumerate(m.all_nodes())}
     eids = {e.name: i + 1 for i, e in enumerate(m.entities)}
     L = ["-- generated; SQLite" + (f" from model version {m.version}" if m.version else ""), "PRAGMA foreign_keys=ON;"]
-    L += sql_tables(m) + sql_inserts(S, m, ids, eids) + sql_views(S, m)
+    L += sql_tables(m) + sql_inserts(m, ids, eids) + sql_views(m)
     w(out, "schema.sql", "\n".join(L) + "\n")
 
 
@@ -381,33 +374,33 @@ def tql_relations(m):
     return L
 
 
-def tql_data(S, m):
+def tql_data(m):
     D = ["# DRAFT data load"]
     for n in m.all_nodes():
         D.append(f"insert $c isa capability, has path {jq(n.path())}, has name {jq(n.name)}"
-                 + "".join(f", has {k} {jq(v)}" for (k, _), v in zip(cap_cols(m), cap_values(m, n)) if v is not None) + ";")
+                 + "".join(f", has {k} {jq(v)}" for k, v in zip(m.props, cap_values(m, n)) if v is not None) + ";")
     for n in m.all_nodes():
         if n.parent.parent is not None:
             D.append(f"match $p isa capability, has path {jq(n.parent.path())}; $c isa capability, has path {jq(n.path())}; insert capability_hierarchy(parent: $p, child: $c);")
     for e in m.entities:
-        D.append(f"insert $e isa {pyname(e.type)}, has name {jq(e.name)}" + "".join(f", has {k} {jq(v)}" for k, v in S.eprops(m, e).items() if v is not None) + ";")
+        D.append(f"insert $e isa {pyname(e.type)}, has name {jq(e.name)}" + "".join(f", has {k} {jq(v)}" for k, v in eprops(m, e).items() if v is not None) + ";")
     for e in m.entities:
         for r in e.rels:
             t = r["target"]
             if t is None:
                 continue
-            key = f"$t isa capability, has path {jq(t.path())}" if isinstance(t, S.Node) else f"$t isa {pyname(t.type)}, has name {jq(t.name)}"
+            key = f"$t isa capability, has path {jq(t.path())}" if isinstance(t, Node) else f"$t isa {pyname(t.type)}, has name {jq(t.name)}"
             D.append(f"match $s isa {pyname(e.type)}, has name {jq(e.name)}; {key}; insert {r['verb']}(source: $s, target: $t)"
                      + "".join(f" has {r['verb']}_{k} {jq(v)}" for k, v in r["attrs"].items()) + ";")
     return D
 
 
-def gen_typeql(S, m, out, level):
+def gen_typeql(m, out, level):
     L = ["# DRAFT - generated, not run against a TypeDB server. Check syntax against your TypeDB 3.x version.", "define", ""]
     L += tql_attributes(m) + [""] + tql_entities(m) + tql_relations(m)
     L += ["", "# rules and constraints (min_level, no_cycles, satisfied_by) are enforced in the generating model, not in this schema.", ""]
     w(out, "schema.tql", "\n".join(L) + "\n")
-    w(out, "data.tql", "\n".join(tql_data(S, m)) + "\n")
+    w(out, "data.tql", "\n".join(tql_data(m)) + "\n")
 
 
 # ---------------------------------------------------------------- json schema / openapi
@@ -437,7 +430,7 @@ def def_link(rt):
         "attrs": {"type": "object", "additionalProperties": False, "properties": {k: js_type(p) for k, p in rt.attrs.items()}}}})
 
 
-def schemas(S, m):
+def schemas(m):
     defs = {"Capability": def_capability(m),
             "Link": {"type": "object", "required": ["target"], "properties": {"target": {"type": "string"}, "attrs": {"type": "object"}}}}
     for t in m.etypes.values():
@@ -447,15 +440,15 @@ def schemas(S, m):
     return defs
 
 
-def gen_jsonschema(S, m, out, level):
+def gen_jsonschema(m, out, level):
     doc = {"$schema": "https://json-schema.org/draft/2020-12/schema", "title": f"{m.root_name} model", "type": "object",
            "properties": {"capabilities": {"type": "array", "items": {"$ref": "#/$defs/Capability"}},
-                          "entities": {"type": "array", "items": {"oneOf": [{"$ref": f"#/$defs/{t}"} for t in m.etypes]}}}, "$defs": schemas(S, m)}
+                          "entities": {"type": "array", "items": {"oneOf": [{"$ref": f"#/$defs/{t}"} for t in m.etypes]}}}, "$defs": schemas(m)}
     w(out, "schema.json", json.dumps(doc, indent=2))
 
 
-def gen_openapi(S, m, out, level):
-    comp = {k: json.loads(json.dumps(v).replace("#/$defs/", "#/components/schemas/")) for k, v in schemas(S, m).items()}
+def gen_openapi(m, out, level):
+    comp = {k: json.loads(json.dumps(v).replace("#/$defs/", "#/components/schemas/")) for k, v in schemas(m).items()}
     ref = lambda r: {"$ref": f"#/components/schemas/{r}"}
     ok = lambda r, arr=False: {"200": {"description": "ok", "content": {"application/json": {"schema": (
         {"type": "array", "items": ref(r)} if arr else ref(r))}}}}
@@ -474,34 +467,34 @@ def gen_openapi(S, m, out, level):
 
 
 # ---------------------------------------------------------------- mermaid / csv
-def mermaid_nodes(S, m, shown, mid):
+def mermaid_nodes(m, shown, mid):
     L = []
     for n in shown:
-        L.append(f'  {mid(S.cid(n))}["L{n.level()} {n.name}"]')
+        L.append(f'  {mid(cid(n))}["L{n.level()} {n.name}"]')
         if n.parent.parent is not None:
-            L.append(f"  {mid(S.cid(n.parent))} --> {mid(S.cid(n))}")
-    return L + [f'  {mid(S.eid(e))}(["{e.name}<br/><i>{e.type}</i>"])' for e in m.entities]
+            L.append(f"  {mid(cid(n.parent))} --> {mid(cid(n))}")
+    return L + [f'  {mid(eid(e))}(["{e.name}<br/><i>{e.type}</i>"])' for e in m.entities]
 
 
-def mermaid_edges(S, m, shown, mid):
+def mermaid_edges(m, shown, mid):
     L = []
     for e in m.entities:
         for r in e.rels:
             t = r["target"]
             if t is None:
                 continue
-            if isinstance(t, S.Node):
+            if isinstance(t, Node):
                 while t not in shown and t.parent.parent is not None:
                     t = t.parent
             lab = r["verb"] + ("*" if r["attrs"].get("coverage") == "partial" else "")
-            L.append(f"  {mid(S.eid(e))} -->|{lab}| {mid(S.nid(t))}")
+            L.append(f"  {mid(eid(e))} -->|{lab}| {mid(nid(t))}")
     return L
 
 
-def gen_mermaid(S, m, out, level):
+def gen_mermaid(m, out, level):
     mid = lambda i: "n" + re.sub(r"\W", "_", i)
     shown = [n for n in m.all_nodes() if n.level() <= level]
-    L = ["```mermaid", "flowchart LR"] + mermaid_nodes(S, m, shown, mid) + mermaid_edges(S, m, shown, mid) + ["```"]
+    L = ["```mermaid", "flowchart LR"] + mermaid_nodes(m, shown, mid) + mermaid_edges(m, shown, mid) + ["```"]
     w(out, "model.md", "\n".join(L) + "\n")
 
 
@@ -512,18 +505,18 @@ def write_csv(out, name, header, rows):
         c.writerows(rows)
 
 
-def gen_csv(S, m, out, level):
+def gen_csv(m, out, level):
     os.makedirs(out, exist_ok=True)
     write_csv(out, "capabilities.csv", ["id", "path", "name", "level"] + list(m.props),
               ([n.uid or "", n.path(), n.name, n.level()] + cap_values(m, n) for n in m.all_nodes()))
     keys = []
     for e in m.entities:
-        keys += [k for k in S.eprops(m, e) if k not in keys]
+        keys += [k for k in eprops(m, e) if k not in keys]
     write_csv(out, "entities.csv", ["id", "name", "type"] + keys,
-              ([e.uid or "", e.name, e.type] + [S.eprops(m, e).get(k, "") for k in keys] for e in m.entities))
+              ([e.uid or "", e.name, e.type] + [eprops(m, e).get(k, "") for k in keys] for e in m.entities))
     ak = sorted({k for rt in m.rtypes.values() for k in rt.attrs})
     write_csv(out, "relations.csv", ["source", "relation", "target", "target_kind"] + ak,
-              ([e.name, r["verb"], S.target_text(r), "capability" if isinstance(r["target"], S.Node) else "entity"] + [r["attrs"].get(k, "") for k in ak]
+              ([e.name, r["verb"], target_text(r), "capability" if isinstance(r["target"], Node) else "entity"] + [r["attrs"].get(k, "") for k in ak]
                for e in m.entities for r in e.rels if r["target"] is not None))
 
 
@@ -531,8 +524,8 @@ GENS = {"site": gen_site, "sql": gen_sql, "typeql": gen_typeql, "jsonschema": ge
         "openapi": gen_openapi, "mermaid": gen_mermaid, "csv": gen_csv}
 
 
-def run(S, m, kind, outdir, level):
-    errs, _ = S.validate(m)
+def run(m, kind, outdir, level):
+    errs, _ = validate(m)
     if errs:
         raise SystemExit("refusing to generate from an invalid model:\n  - " + "\n  - ".join(errs))
     kinds = list(GENS) if kind == "all" else [kind]
@@ -540,5 +533,5 @@ def run(S, m, kind, outdir, level):
         if k not in GENS:
             raise SystemExit(f"unknown generator '{k}' (choose: {', '.join(GENS)}, all)")
         d = os.path.join(outdir, k) if kind == "all" else outdir
-        GENS[k](S, m, d, level)
+        GENS[k](m, d, level)
         print(f"generated {k} -> {d}")

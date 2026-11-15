@@ -1,12 +1,12 @@
-import collections, json, os, re, sys
+import os, re, sys
+import semyaml
 from semmodel.model import *
 from semmodel.rules import *
 
 
 def load(path):
     if os.path.isdir(path) or path.endswith((".yaml", ".yml")):
-        import semyaml
-        return semyaml.load(path, facade())
+        return semyaml.load(path)
     return load_sem(path)
 
 

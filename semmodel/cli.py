@@ -14,7 +14,8 @@ YAML       ids [--dry-run]   give every capability and entity without an `id` a 
 Model: $SEM_MODEL, else ./model/ (YAML, see semyaml.py) if present, else ./model.sem. A YAML model is read-only
 here: EDIT and META commands refuse it, edit its files (or use server.py). `yaml <outdir>` converts any model.
 """
-import collections, json, os, re, sys
+import collections, json, os, sys
+import gen, semyaml
 from semmodel.model import *
 from semmodel.rules import *
 from semmodel.legacy import *
@@ -27,26 +28,13 @@ def yaml_root():
     return root
 
 
-def bump(old, how):
-    """The version after `how` (major | minor | patch | an explicit x.y.z); ValueError if that is not possible."""
-    if how in ("major", "minor", "patch"):
-        if not old or not SEMVER_RE.match(old):
-            raise ValueError(f"cannot bump '{old}'; set a version first (e.g. 1.0.0)")
-        x, y, z = (int(v) for v in re.match(r"(\d+)\.(\d+)\.(\d+)", old).groups())
-        return {"major": f"{x + 1}.0.0", "minor": f"{x}.{y + 1}.0", "patch": f"{x}.{y}.{z + 1}"}[how]
-    if not SEMVER_RE.match(how):
-        raise ValueError(f"'{how}' is not MAJOR.MINOR.PATCH (or major / minor / patch)")
-    return how
-
-
 def cmd_version(rest):
-    import semyaml
     root = yaml_root()
     old = semyaml.read_version(root)
     if not rest:
         return print(old or "no version set")
     try:
-        new = bump(old, rest[0])
+        new = semyaml.bump(old, rest[0])
     except ValueError as x:
         sys.exit(str(x))
     semyaml.write_version(root, new)
@@ -54,7 +42,6 @@ def cmd_version(rest):
 
 
 def cmd_ids(rest):
-    import semyaml
     dry = "--dry-run" in rest
     done = semyaml.assign_ids(yaml_root(), dry_run=dry)
     for f, label, uid in done:
@@ -70,7 +57,7 @@ def cmd_locate(m, text):
         print(f"{len(hits)} objects have ids starting with '{text}'; give more digits:")
     for x in hits:
         line = id_line(m, x)
-        print(describe(m, x))
+        print(describe(x))
         print(f"  {x.src}{f':{line}' if line else ''}   id {x.uid}")
 
 
@@ -167,18 +154,10 @@ def cmd_neighbors(m, x):
 
 
 def cmd_closure(m, x, rel):
-    adj = adjacency(m)
-    start = nid(x)
-    seen, queue = {start}, collections.deque([(start, 0)])
-    found = False
-    while queue:
-        cur, d = queue.popleft()
-        for lab, other, _ in adj[cur]:
-            if lab == rel and other not in seen:
-                seen.add(other)
-                queue.append((other, d + 1))
-                print("  " * d + "-> " + disp(other) if d else disp(other))
-                found = True
+    start, found = nid(x), False
+    for other, hops in reach(adjacency(m), start, rel):
+        print("  " * (hops - 1) + "-> " + disp(other) if hops > 1 else disp(other))
+        found = True
     if not found:
         print(f"nothing reachable from {disp(start)} via '{rel}'")
 
@@ -211,7 +190,8 @@ def cmd_who(m, x):
     print(f"{x.path() if isinstance(x, Node) else x.name}")
     print_by(by_label(adjacency(m), x, "()", " "))
     if isinstance(x, Node):
-        below = [e for e in providers(m, x) if all(r["target"] is not x for r in e.rels if r["verb"] in provide_verbs(m))]
+        verbs = provide_verbs(m)
+        below = [e for e in providers(m, x) if not directly_provides(e, x, verbs)]
         if below:
             print("  also provided via sub-capabilities by: " + ", ".join(e.name for e in below))
 
@@ -222,7 +202,7 @@ def cmd_gaps(m):
         return print("no unmet requirements")
     print(f"{len(g)} unmet requirement(s)")
     for e, r, rt in g:
-        print(f"  - {e.name} {rt.name} {r['target'].path()} ({r['attrs'].get('dependency', 'hard')}): nothing {'/'.join(rt.satisfied_by)} it")
+        print(f"  - {e.name} {rt.name} {r['target'].path()} ({dependency(r)}): nothing {'/'.join(rt.satisfied_by)} it")
 
 
 def cmd_coverage(m):
@@ -231,7 +211,7 @@ def cmd_coverage(m):
     white = 0
     print(f"coverage at L{min_lv}+ via {', '.join(sorted(verbs))} (a capability counts providers beneath it too)")
     for n in nodes:
-        direct = [e for e in m.entities if any(r["verb"] in verbs and r["target"] is n for r in e.rels)]
+        direct = [e for e in m.entities if directly_provides(e, n, verbs)]
         rolled = providers(m, n)
         status = "WHITE SPACE" if not rolled else ("overlap" if len(direct) >= 2 else "")
         white += not rolled
@@ -242,7 +222,7 @@ def cmd_coverage(m):
 
 def cmd_impact(m, e):
     i = impact(m, e)
-    hard = [u for u in i["unmet"] if u[1]["attrs"].get("dependency", "hard") == "hard"]
+    hard = [u for u in i["unmet"] if dependency(u[1]) == "hard"]
     print(f"retirement impact of {e.name} ({e.type})" + ("  [already retired: it no longer counts as a provider]" if retired(e) else ""))
     if not (i["white"] or i["unmet"] or i["dependents"] or i["referenced"]):
         print("  safe to retire: nothing relies on it")
@@ -255,7 +235,7 @@ def cmd_impact(m, e):
     for n in i["white"]:
         print(f"  white space: {n.path()}")
     for x, r, rt in i["unmet"]:
-        print(f"  unmet: {x.name} {rt.name} {r['target'].path()} ({r['attrs'].get('dependency', 'hard')})")
+        print(f"  unmet: {x.name} {rt.name} {r['target'].path()} ({dependency(r)})")
     for rt, out in i["dependents"]:
         print(f"  {rt.inverse} (via {rt.name}): " + ", ".join(f"{disp(x)}{'' if d == 1 else f' ({d} hops)'}" for x, d in out))
     for x, p in i["referenced"]:
@@ -326,15 +306,13 @@ def cmd_export(m):
 
 
 def cmd_yaml(m, outdir):
-    import semyaml
-    for p in semyaml.dump(m, facade(), outdir):
+    for p in semyaml.dump(m, outdir):
         print("wrote", p)
 
 
 def cmd_gen(m, rest):
-    import gen
     lv = int(rest[rest.index("--level") + 1]) if "--level" in rest else 3
-    gen.run(facade(), m, rest[0], rest[1], lv)
+    gen.run(m, rest[0], rest[1], lv)
 
 
 # Commands that run before the model is loaded: name -> (min args, max args or None, handler(rest)).

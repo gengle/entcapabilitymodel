@@ -20,8 +20,8 @@ import argparse, collections, hashlib, json, mimetypes, os, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-import sem
 import semyaml
+from semmodel import model, rules
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(HERE, "web", "dist")
@@ -30,23 +30,15 @@ ROOT = None  # absolute model folder, set in main()
 UI_FILE = "ui.yaml"  # viewer form settings, not part of the model
 
 
-def yaml_files():
-    out = []
-    for d, dirs, files in os.walk(ROOT):
-        dirs[:] = sorted(x for x in dirs if not x.startswith("."))
-        out += [os.path.join(d, f) for f in sorted(files) if f.endswith((".yaml", ".yml"))]
-    return out
-
-
 def rel(p):
     return os.path.relpath(p, ROOT).replace(os.sep, "/")
 
 
 def version():
     h = hashlib.sha1()
-    for p in yaml_files():
+    for p, r in semyaml.yaml_files(ROOT):
         st = os.stat(p)
-        h.update(f"{rel(p)}:{st.st_mtime_ns}:{st.st_size};".encode())
+        h.update(f"{r}:{st.st_mtime_ns}:{st.st_size};".encode())
     return h.hexdigest()[:16]
 
 
@@ -61,7 +53,7 @@ def safe_path(r):
 
 def load(overrides=None):
     """Load the model; overrides maps absolute paths to replacement text (None = deleted)."""
-    return semyaml.load(ROOT, sem, overrides)
+    return semyaml.load(ROOT, overrides)
 
 
 # ------------------------------------------------------------------ snapshot
@@ -76,22 +68,22 @@ class Index:
 
     def __init__(self, m):
         self.m = m
-        self.verbs, self.min_lv = sem.provide_verbs(m), sem.provide_min_level(m)
+        self.verbs, self.min_lv = rules.provide_verbs(m), rules.provide_min_level(m)
         self.incoming = collections.defaultdict(list)
         for e in m.entities:
             for r in e.rels:
                 if r["target"] is not None and r["verb"] in m.rtypes:
                     rt = m.rtypes[r["verb"]]
-                    self.incoming[sem.nid(r["target"])].append({
-                        "verb": rt.name, "inverse": rt.inverse or f"~{rt.name}", "from": sem.eid(e),
+                    self.incoming[rules.nid(r["target"])].append({
+                        "verb": rt.name, "inverse": rt.inverse or f"~{rt.name}", "from": rules.eid(e),
                         "attrs": r["attrs"], "src": r.get("src")})
-        for x, p, t in sem.refs(m):  # ref props (e.g. owner) point at entities too
-            self.incoming[sem.eid(t)].append({"verb": p.name, "inverse": f"{p.name}_of", "from": sem.nid(x),
+        for x, p, t in rules.refs(m):  # ref props (e.g. owner) point at entities too
+            self.incoming[rules.eid(t)].append({"verb": p.name, "inverse": f"{p.name}_of", "from": rules.nid(x),
                                               "attrs": {}, "src": x.prop_src.get(p.name)})
 
     def ref_id(self, p, v):
         t = self.m.ref(p, v)
-        return sem.eid(t) if t else None
+        return rules.eid(t) if t else None
 
 
 def cap_props(ix, n):
@@ -113,13 +105,13 @@ def cap_props(ix, n):
 
 def cap_json(ix, n):
     m = ix.m
-    direct = [sem.eid(e) for e in m.entities if any(r["verb"] in ix.verbs and r["target"] is n for r in e.rels)]
-    rolled = [sem.eid(e) for e in sem.providers(m, n)]
+    direct = [rules.eid(e) for e in m.entities if rules.directly_provides(e, n, ix.verbs)]
+    rolled = [rules.eid(e) for e in rules.providers(m, n)]
     status = None if n.level() < ix.min_lv else "white" if not rolled else "overlap" if len(direct) >= 2 else "ok"
-    return {"id": sem.cid(n), "uid": n.uid, "name": n.name, "path": n.path(), "level": n.level(), "levelName": m.levels.get(n.level(), ""),
+    return {"id": rules.cid(n), "uid": n.uid, "name": n.name, "path": n.path(), "level": n.level(), "levelName": m.levels.get(n.level(), ""),
             "src": n.src, "props": cap_props(ix, n), "extra": [k for k in n.local if k not in m.props],
             "providers": direct, "rolledProviders": rolled, "status": status,
-            "incoming": ix.incoming[sem.cid(n)], "children": [cap_json(ix, c) for c in n.children]}
+            "incoming": ix.incoming[rules.cid(n)], "children": [cap_json(ix, c) for c in n.children]}
 
 
 def ent_json(ix, e):
@@ -130,10 +122,10 @@ def ent_json(ix, e):
               "src": e.prop_src.get(k), "ref": ix.ref_id(p, e.local.get(k, p.default))} for k, p in defs.items()]
     props += [{"name": k, "value": v, "origin": "unknown", "src": e.prop_src.get(k), "ref": None}
               for k, v in e.local.items() if k not in defs]
-    rels = [{"verb": r["verb"], "text": r["text"], "target": sem.nid(r["target"]) if r["target"] is not None else None,
-             "label": sem.target_text(r), "attrs": r["attrs"], "src": r.get("src"), "err": r["err"]} for r in e.rels]
-    return {"id": sem.eid(e), "uid": e.uid, "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
-            "retired": sem.retired(e), "props": props, "relations": rels, "incoming": ix.incoming[sem.eid(e)],
+    rels = [{"verb": r["verb"], "text": r["text"], "target": rules.nid(r["target"]) if r["target"] is not None else None,
+             "label": rules.target_text(r), "attrs": r["attrs"], "src": r.get("src"), "err": r["err"]} for r in e.rels]
+    return {"id": rules.eid(e), "uid": e.uid, "name": e.name, "type": e.type, "chain": m.chain(e.type), "src": e.src,
+            "retired": rules.retired(e), "props": props, "relations": rels, "incoming": ix.incoming[rules.eid(e)],
             "impact": impact_json(m, e)}
 
 
@@ -152,8 +144,7 @@ def issue_json(owners, level, msg):
 def file_infos(m):
     """Every YAML file under the model folder with its includes, plus what each file defines."""
     files = {}
-    for p in yaml_files():
-        r = rel(p)
+    for p, r in semyaml.yaml_files(ROOT):
         if r == UI_FILE and r not in m.files:
             continue
         info = m.files.get(r)
@@ -171,10 +162,10 @@ def file_infos(m):
                 files[inc]["includedBy"].append(r)
     for n in m.all_nodes():
         if n.src in files and (n.parent is m.top or n.parent.src != n.src):
-            files[n.src]["defines"].append(sem.cid(n))
+            files[n.src]["defines"].append(rules.cid(n))
     for e in m.entities:
         if e.src in files:
-            files[e.src]["defines"].append(sem.eid(e))
+            files[e.src]["defines"].append(rules.eid(e))
     return list(files.values())
 
 
@@ -190,7 +181,7 @@ def etype_json(m, t):
 
 
 def snapshot(m):
-    errs, warns = sem.validate(m)
+    errs, warns = rules.validate(m)
     ix = Index(m)
     entities = [ent_json(ix, e) for e in m.entities]
     owners = issue_owners(m)
@@ -206,29 +197,29 @@ def snapshot(m):
         "entities": entities,
         "files": file_infos(m),
         "issues": [issue_json(owners, "error", x) for x in errs] + [issue_json(owners, "warning", x) for x in warns],
-        "gaps": [{"entity": sem.eid(e), "verb": rt.name, "target": sem.cid(r["target"]),
-                  "dependency": r["attrs"].get("dependency", "hard"), "satisfiedBy": rt.satisfied_by} for e, r, rt in sem.unmet(m)],
-        "coverage": {"minLevel": ix.min_lv, "total": len(covered), "covered": sum(1 for n in covered if sem.providers(m, n))},
+        "gaps": [{"entity": rules.eid(e), "verb": rt.name, "target": rules.cid(r["target"]),
+                  "dependency": rules.dependency(r), "satisfiedBy": rt.satisfied_by} for e, r, rt in rules.unmet(m)],
+        "coverage": {"minLevel": ix.min_lv, "total": len(covered), "covered": sum(1 for n in covered if rules.providers(m, n))},
     }
 
 
 def impact_json(m, e):
-    """sem.impact as JSON (see Impact in web/src/types.ts)."""
-    i = sem.impact(m, e)
-    return {"provides": [{"target": sem.cid(n), "others": [sem.eid(x) for x in others]} for n, others in i["provides"]],
-            "white": [sem.cid(n) for n in i["white"]],
-            "unmet": [{"entity": sem.eid(x), "verb": rt.name, "target": sem.cid(r["target"]),
-                       "dependency": r["attrs"].get("dependency", "hard")} for x, r, rt in i["unmet"]],
+    """rules.impact as JSON (see Impact in web/src/types.ts)."""
+    i = rules.impact(m, e)
+    return {"provides": [{"target": rules.cid(n), "others": [rules.eid(x) for x in others]} for n, others in i["provides"]],
+            "white": [rules.cid(n) for n in i["white"]],
+            "unmet": [{"entity": rules.eid(x), "verb": rt.name, "target": rules.cid(r["target"]),
+                       "dependency": rules.dependency(r)} for x, r, rt in i["unmet"]],
             "dependents": [{"relation": rt.name, "inverse": rt.inverse, "affected": [{"id": x, "hops": d} for x, d in out]}
                            for rt, out in i["dependents"]],
-            "referenced": [{"from": sem.nid(x), "prop": p.name} for x, p in i["referenced"]]}
+            "referenced": [{"from": rules.nid(x), "prop": p.name} for x, p in i["referenced"]]}
 
 
 def impact(m, name):
     e = m.entity(name)
     if e is None:
         raise ValueError(f"no entity '{name}'")
-    return {"entity": sem.eid(e), **impact_json(m, e)}
+    return {"entity": rules.eid(e), **impact_json(m, e)}
 
 
 # ------------------------------------------------------------------ http
@@ -306,8 +297,8 @@ class Handler(BaseHTTPRequestHandler):
     def get_locate(self):
         m, q = load(), self.query().get("id", "")
         self.send(200, {"query": q, "matches": [
-            {"id": sem.nid(x), "uid": x.uid, "kind": "capability" if isinstance(x, sem.Node) else "entity",
-             "label": sem.describe(m, x), "file": x.src, "line": sem.id_line(m, x)} for x in sem.locate(m, q)]})
+            {"id": rules.nid(x), "uid": x.uid, "kind": "capability" if isinstance(x, model.Node) else "entity",
+             "label": rules.describe(x), "file": x.src, "line": rules.id_line(m, x)} for x in rules.locate(m, q)]})
 
     def post_ids(self):
         with LOCK:
@@ -317,7 +308,7 @@ class Handler(BaseHTTPRequestHandler):
     def post_version(self):
         to = str(self.body().get("to", "")).strip()
         with LOCK:
-            new = sem.bump(semyaml.read_version(ROOT), to)  # ValueError -> 400
+            new = semyaml.bump(semyaml.read_version(ROOT), to)  # ValueError -> 400
             semyaml.write_version(ROOT, new)
             self.send(200, with_version(load()))
 
@@ -330,8 +321,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def change(self, overrides, force, apply):
         with LOCK:
-            before = set(sem.validate(load())[0])
-            added = [x for x in sem.validate(load(overrides))[0] if x not in before]
+            before = set(rules.validate(load())[0])
+            added = [x for x in rules.validate(load(overrides))[0] if x not in before]
             if added and not force:
                 return self.send(422, {"error": "rejected: the change adds validation errors", "errors": added})
             apply()
