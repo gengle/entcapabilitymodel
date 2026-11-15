@@ -1,0 +1,41 @@
+kind: Capability
+name: Insurance Policy Administration
+id: 41b1589d-f1bc-484a-9a47-3443e1986176
+props:
+  owner: Insurance Architecture
+  criticality: high
+children:
+  - name: Policy Issuance
+    id: eb35fd3a-6642-4763-a8b7-1847c2c8a6c8
+    children:
+      - name: Coverage Binding
+        id: a989b0a6-071c-4be9-b6d9-0368cade85b7
+      - name: Policy Issuance Processing
+        id: fd8c5f8d-2ebc-4b66-83bb-4ba6d3350f9c
+      - name: Insurance Document Production
+        id: 56d899ee-c32a-4af6-bd00-d3b8ebfb3ac8
+  - name: Policy Servicing
+    id: 13ed2bc2-3e6a-40b9-8729-4b2fc2c25962
+    children:
+      - name: Policy Inquiry
+        id: 46454c2e-8c0b-4a37-9ea1-7ec13f80cd91
+      - name: Policy Change Management
+        id: 3c1a7881-7e38-4f10-a510-5f887dface4b
+        children:
+          - name: Endorsement Processing
+            id: f60b48c1-eb40-46fc-9869-db86db3398ff
+          - name: Insured Exposure Updates
+            id: 77e9a20e-0800-4e68-91a0-15dc32f29266
+      - name: Policy Document Management
+        id: e39bb132-0cf6-4f46-939f-d858557cb32f
+  - name: Policy Lifecycle
+    id: abcb7cc7-73de-4546-895f-00d4bcc81857
+    children:
+      - name: Policy Renewal
+        id: 5eb596fe-2939-4243-8aa7-a25c981eda74
+      - name: Policy Cancellation
+        id: ee046591-336c-4a58-980d-e6dcf78c4604
+      - name: Policy Reinstatement
+        id: fc707777-7ffb-495a-8180-e3b8a4b32cd0
+      - name: Policy Expiration
+        id: 31faa685-d040-4251-9151-b133ae386915

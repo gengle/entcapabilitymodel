@@ -1,0 +1,12 @@
+kind: Entity
+type: InsuranceProduct
+name: Example Commercial Property Product
+id: 922b041b-b875-4b47-9ff2-fc934c99186a
+props:
+  identifier: PRODUCT-001
+  line_of_business: Commercial property
+  description: Fictional product offering commercial property protection.
+relations:
+  offers_coverage:
+    - Example Building Coverage
+    - Example Business Income Coverage

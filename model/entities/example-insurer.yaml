@@ -1,0 +1,7 @@
+kind: Entity
+type: Organization
+name: Example Mutual Insurer
+id: 3e9b1bbd-4773-4fdd-a34d-9fee18e71722
+props:
+  identifier: ORG-INSURER-001
+  description: Fictional insurer issuing the example policy.

@@ -1,0 +1,11 @@
+kind: Entity
+type: Reserve
+name: Example Warehouse Claim Reserve
+id: e591dfd6-567f-438b-be62-354c310294ad
+props:
+  identifier: RESERVE-001
+  amount: "25000 USD"
+  description: Illustrative outstanding claim estimate.
+relations:
+  reserves_claim:
+    - Example Warehouse Claim

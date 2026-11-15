@@ -1,0 +1,11 @@
+kind: Entity
+type: Invoice
+name: Example Premium Invoice
+id: 40a91493-e93d-48af-b33a-1a099f2c392c
+props:
+  identifier: INVOICE-001
+  amount: "12000 USD"
+  description: Illustrative premium invoice.
+relations:
+  invoice_for:
+    - Example Property Billing Account

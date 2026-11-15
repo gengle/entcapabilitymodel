@@ -7,6 +7,7 @@ export type Route =
   | { k: "overview" }
   | { k: "schema" }
   | { k: "forms" }
+  | { k: "print" }
   | { k: "file"; path: string }
   | { k: "ent"; id: string }
   | { k: "cap"; id: string }
@@ -17,6 +18,7 @@ export function parseHash(hash: string): Route {
   const arg = decodeURIComponent(rest.join("/"));
   if (kind === "schema") return { k: "schema" };
   if (kind === "forms") return { k: "forms" };
+  if (kind === "print") return { k: "print" };
   if (kind === "file" && arg) return { k: "file", path: arg };
   if (kind === "ent" && arg) return { k: "ent", id: "ent:" + arg };
   if (kind === "cap" && arg) return { k: "cap", id: "cap:" + arg };

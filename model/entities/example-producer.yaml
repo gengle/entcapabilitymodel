@@ -1,0 +1,7 @@
+kind: Entity
+type: Organization
+name: Example Coastal Brokerage
+id: 65ee081a-7f7a-4cb9-9ae1-723429430f41
+props:
+  identifier: ORG-PRODUCER-001
+  description: Fictional brokerage submitting and placing the example policy.

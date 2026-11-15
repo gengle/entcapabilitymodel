@@ -9,6 +9,7 @@ relations:
   exposes:
     - target: Invoice Approval
       coverage: partial
+    - Quote Management
   requires:
     - Privileged Access
   depends_on:

@@ -1,0 +1,7 @@
+kind: Entity
+type: Coverage
+name: Example Building Coverage
+id: 799bd6a1-1882-4462-9caa-c867e9217b1f
+props:
+  identifier: COVERAGE-001
+  description: Illustrative protection for a covered building, subject to policy terms.

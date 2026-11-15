@@ -1,0 +1,33 @@
+kind: Capability
+name: Reinsurance
+id: 81ac0b48-6137-4298-837d-122aa45f5dd9
+props:
+  owner: Insurance Architecture
+children:
+  - name: Reinsurance Placement
+    id: 4d2e39d0-3791-4164-b494-3f97e7c14db3
+    children:
+      - name: Reinsurance Strategy
+        id: 5892ddf5-0ac2-45fe-b9a0-6d39a6db2348
+      - name: Reinsurance Agreement Management
+        id: 937b02dd-94e4-48e6-a6e2-bce566ed6692
+      - name: Reinsurer Relationship Management
+        id: af172b36-87af-4c1a-b17d-e9015319fba2
+  - name: Reinsurance Administration
+    id: 4b408af6-507e-4855-a7c2-65a49456a741
+    children:
+      - name: Reinsurance Cession Management
+        id: 107f5d06-30c2-4cd7-804e-2fb0bc623496
+      - name: Reinsurance Premium Accounting
+        id: 6815eb7a-2ac1-4665-94b9-e30c8dc8c52a
+      - name: Reinsurance Exposure Monitoring
+        id: bfb07415-1260-4802-98e0-d6e3488eac53
+  - name: Reinsurance Recovery
+    id: e201ded4-561a-4729-bd93-c51b3bf044aa
+    children:
+      - name: Reinsurance Claim Notification
+        id: 5556b7db-31ac-48bf-9d21-0068bdbc4dfc
+      - name: Reinsurance Recovery Calculation
+        id: d60b273b-9431-4b9c-b1ea-612c3ad7804b
+      - name: Reinsurance Collection
+        id: 2e212407-7ee2-4fb6-a43a-ae56b77c9679

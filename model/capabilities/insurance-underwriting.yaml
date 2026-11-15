@@ -1,0 +1,46 @@
+kind: Capability
+name: Insurance Underwriting
+id: 9e460a02-c03a-4202-99c3-2b95f857f6cb
+props:
+  owner: Insurance Architecture
+  criticality: high
+children:
+  - name: Submission Management
+    id: 635d402b-9fa6-422c-a54d-a0277faae3f1
+    children:
+      - name: Submission Intake
+        id: b9f6628c-68db-4343-9f8e-e157131ae2d9
+      - name: Submission Triage
+        id: 9a6fcf62-b826-4b81-9da2-dd5fce961bf3
+      - name: Submission Data Enrichment
+        id: 2939ece6-be33-4599-8bee-16c20676befe
+  - name: Risk Assessment
+    id: f093f566-f124-4b15-bbb3-757736108055
+    children:
+      - name: Exposure Assessment
+        id: 7a11d342-840c-442f-b2dd-34c1829230fc
+        children:
+          - name: Property Exposure Assessment
+            id: b0ba41a7-beed-4542-87d5-aa27883a529a
+          - name: Liability Exposure Assessment
+            id: ae5a4ab9-624b-45ab-a8e1-400daa15a540
+      - name: Underwriting Eligibility Assessment
+        id: 4947774b-8011-48a8-9579-957c4baf48d0
+      - name: Risk Inspection Management
+        id: 9a8599d0-609d-419c-8a36-c1a0eaba4df5
+  - name: Underwriting Decision
+    id: 9788932e-5e52-435a-8ecd-b61082c650c3
+    children:
+      - name: Insurance Pricing
+        id: 058adef3-039e-4089-96ab-56b159ae00e6
+        children:
+          - name: Rate Calculation
+            id: 38ea04ce-031b-4f6f-bd92-87674cd183f8
+          - name: Underwriting Adjustments
+            id: 392daaae-1c42-4765-8e18-2412fff33117
+      - name: Quote Management
+        id: 0326481d-e768-49d6-ae86-b1b74cc0c685
+      - name: Underwriting Authority Management
+        id: a8ba1f69-f119-4a5e-aadf-1de112058fc0
+      - name: Underwriting Approval
+        id: 660250bc-7cb3-4f7f-862d-113c0ae3ef55

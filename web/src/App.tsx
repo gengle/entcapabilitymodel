@@ -5,6 +5,7 @@ import { buildIndex, href, locateUid, ModelCtx, parseHash, slug, uuid, type Rout
 import { Sidebar } from "./Sidebar";
 import type { Snapshot } from "./types";
 import { FormsView } from "./forms";
+import { PrintView } from "./PrintView";
 import { parseUi, UI_FILE } from "./ui";
 import { CapabilityView, EntityView, FileView, IdView, Overview, SchemaView } from "./views";
 import { applyEdit, type Edit } from "./yamledit";
@@ -124,7 +125,7 @@ export default function App() {
       if (hits.length === 1) location.replace(href(hits[0].id));
       return setActive(null);
     }
-    if (route.k === "overview" || route.k === "schema" || route.k === "forms") return setActive(null);
+    if (route.k === "overview" || route.k === "schema" || route.k === "forms" || route.k === "print") return setActive(null);
     const p =
       route.k === "file"
         ? route.path
@@ -280,12 +281,13 @@ export default function App() {
   const dirty = new Set(dirtyFiles.map(([p]) => p));
   const errors = view.issues.filter((i) => i.level === "error").length;
   const warnings = view.issues.length - errors;
-  const showEditor = route.k !== "overview" && route.k !== "schema" && route.k !== "forms" && !!active;
+  const showEditor = route.k !== "overview" && route.k !== "schema" && route.k !== "forms" && route.k !== "print" && !!active;
 
   let main: React.ReactNode;
   if (route.k === "overview") main = <Overview />;
   else if (route.k === "schema") main = <SchemaView />;
   else if (route.k === "forms") main = <FormsView />;
+  else if (route.k === "print") main = <PrintView />;
   else if (route.k === "id") main = <IdView uid={route.uid} hits={locateUid(idx, route.uid)} />;
   else if (route.k === "file") {
     const f = idx.files.get(route.path);
@@ -310,7 +312,7 @@ export default function App() {
     <ModelCtx.Provider
       value={{ snap: view, idx, dirty, ui, uiText, saveUi, formMode, setFormMode, mutate, save: () => saveRef.current(), saveFile: (p: string) => saveRef.current(false, p), revert, mutateFile, run }}
     >
-      <div className={`app${showEditor ? "" : " no-editor"}`}>
+      <div className={`app${showEditor ? "" : " no-editor"}${route.k === "print" ? " print-layout" : ""}`}>
         <header className="top">
           <a className="brand" href="#/">
             {view.model.name ?? "Semantic model"}
@@ -332,6 +334,9 @@ export default function App() {
             <a href="#/forms" className={route.k === "forms" ? "on" : ""} title="Choose the control that edits each field">
               Forms
             </a>
+            <a href="#/print" className={route.k === "print" ? "on" : ""}>
+              Capability map
+            </a>
           </nav>
           <span className="grow" />
           {preview && <span className="pill preview">preview · {dirty.size} unsaved</span>}
@@ -343,7 +348,7 @@ export default function App() {
             {online ? "live" : "offline"}
           </span>
         </header>
-        <Sidebar route={route} active={active} onCreate={create} />
+        {route.k !== "print" && <Sidebar route={route} active={active} onCreate={create} />}
         {showEditor && active && (
           <EditorPane
             path={active}

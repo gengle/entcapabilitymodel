@@ -1,0 +1,15 @@
+kind: Entity
+type: Application
+name: Example Policy Platform
+id: 80c455f7-5f3d-4cd2-8000-5ecac936d0eb
+props:
+  owner: Example Insurance Operations
+  vendor: fictional
+relations:
+  exposes:
+    - target: Insurance Policy Administration/Policy Issuance/Policy Issuance Processing
+      coverage: partial
+    - target: Insurance Policy Administration/Policy Lifecycle/Policy Renewal
+      coverage: partial
+  requires:
+    - Insurance Underwriting/Submission Management/Submission Intake

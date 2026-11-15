@@ -1,0 +1,147 @@
+kind: Schema
+relations:
+  offers_coverage:
+    description: A product makes a coverage available.
+    from: [InsuranceProduct]
+    to: [Coverage]
+    inverse: offered_by_product
+  submitted_for:
+    description: A submission requests consideration for a product.
+    from: [Submission]
+    to: [InsuranceProduct]
+    inverse: submissions_for
+  submitted_by:
+    description: The party submitting an insurance application.
+    from: [Submission]
+    to: [Party]
+    inverse: submissions_made
+  quotes_submission:
+    description: The underwriting submission addressed by a quote.
+    from: [Quote]
+    to: [Submission]
+    inverse: quoted_by
+  issued_from:
+    description: The accepted quote from which a policy was issued.
+    from: [Policy]
+    to: [Quote]
+    inverse: issued_policies
+  policyholder:
+    description: The party holding a policy.
+    from: [Policy]
+    to: [Party]
+    inverse: held_policies
+  issued_by:
+    description: The insurer issuing the policy.
+    from: [Policy]
+    to: [Organization]
+    inverse: policies_issued
+  insured_party:
+    description: A party insured under a policy.
+    from: [Policy]
+    to: [Party]
+    inverse: insured_policies
+  produced_by:
+    description: The party acting as producer for a submission or policy.
+    from: [Submission, Policy]
+    to: [Party]
+    inverse: produced_business
+  includes_coverage:
+    description: A coverage included in a policy.
+    from: [Policy]
+    to: [Coverage]
+    inverse: included_in_policies
+  covers_risk:
+    description: An exposure insured under a policy.
+    from: [Policy]
+    to: [InsuredRisk]
+    inverse: covered_by_policies
+  coverage_for_policy:
+    description: The policy whose specific coverage terms are represented.
+    from: [PolicyCoverage]
+    to: [Policy]
+    inverse: policy_coverage_terms
+  coverage_type:
+    description: The coverage concept to which policy-specific terms apply.
+    from: [PolicyCoverage]
+    to: [Coverage]
+    inverse: coverage_terms
+  applies_to_risk:
+    description: An insured exposure to which policy-specific coverage terms apply.
+    from: [PolicyCoverage]
+    to: [InsuredRisk]
+    inverse: risk_coverage_terms
+  changes_policy:
+    description: The policy changed by an endorsement or other policy change.
+    from: [PolicyChange]
+    to: [Policy]
+    inverse: policy_changes
+  claim_under_policy:
+    description: The policy under which a claim is reported.
+    from: [Claim]
+    to: [Policy]
+    inverse: policy_claims
+  claim_against_coverage:
+    description: Policy-specific coverage terms relevant to a claim.
+    from: [Claim]
+    to: [PolicyCoverage]
+    inverse: coverage_claims
+  arises_from:
+    description: The loss event from which a claim arises.
+    from: [Claim]
+    to: [LossEvent]
+    inverse: resulting_claims
+  involves_risk:
+    description: An insured exposure involved in a loss event.
+    from: [LossEvent]
+    to: [InsuredRisk]
+    inverse: involved_in_losses
+  claimant:
+    description: The party making a claim.
+    from: [Claim]
+    to: [Party]
+    inverse: claims_made
+  reserves_claim:
+    description: The claim to which a reserve estimate applies.
+    from: [Reserve]
+    to: [Claim]
+    inverse: claim_reserves
+  pays_claim:
+    description: The claim associated with a claim payment.
+    from: [ClaimPayment]
+    to: [Claim]
+    inverse: claim_payments
+  paid_to:
+    description: The party receiving a claim payment.
+    from: [ClaimPayment]
+    to: [Party]
+    inverse: payments_received
+  bills_policy:
+    description: A policy billed through an account.
+    from: [BillingAccount]
+    to: [Policy]
+    inverse: billing_accounts
+  billed_to:
+    description: The party responsible for a billing account.
+    from: [BillingAccount]
+    to: [Party]
+    inverse: billing_responsibilities
+  invoice_for:
+    description: The billing account associated with an invoice.
+    from: [Invoice]
+    to: [BillingAccount]
+    inverse: account_invoices
+  ceded_under:
+    description: The reinsurance agreement governing a cession.
+    from: [ReinsuranceCession]
+    to: [ReinsuranceAgreement]
+    inverse: agreement_cessions
+  cedes_policy:
+    description: The policy whose risk is included in a cession.
+    from: [ReinsuranceCession]
+    to: [Policy]
+    inverse: policy_cessions
+  reinsurer:
+    description: The party accepting risk under a reinsurance agreement.
+    from: [ReinsuranceAgreement]
+    to: [Organization]
+    inverse: reinsurance_agreements

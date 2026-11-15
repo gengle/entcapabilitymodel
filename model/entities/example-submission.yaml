@@ -1,0 +1,15 @@
+kind: Entity
+type: Submission
+name: Example Property Submission
+id: b722de73-2e55-415c-9d15-12eccddbfe98
+props:
+  identifier: SUBMISSION-001
+  received_date: "2026-01-05"
+  description: Fictional application submitted through a brokerage.
+relations:
+  submitted_for:
+    - Example Commercial Property Product
+  submitted_by:
+    - Example Coastal Brokerage
+  produced_by:
+    - Example Coastal Brokerage

@@ -1,0 +1,11 @@
+kind: Entity
+type: LossEvent
+name: Example Warehouse Loss
+id: fc2be687-376e-4ca8-9d96-4f08950318ef
+props:
+  identifier: LOSS-001
+  loss_date: "2026-04-10"
+  description: Fictional loss at the insured warehouse.
+relations:
+  involves_risk:
+    - Example Harbor Warehouse

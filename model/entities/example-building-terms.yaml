@@ -1,0 +1,16 @@
+kind: Entity
+type: PolicyCoverage
+name: Example Building Coverage Terms
+id: 9c8a37f0-ceb3-4c3b-a091-2f3e8822801c
+props:
+  identifier: POLICY-COVERAGE-001
+  limit: "1000000 USD"
+  deductible: "5000 USD"
+  description: Fictional building coverage terms for the insured warehouse.
+relations:
+  coverage_for_policy:
+    - Example Commercial Property Policy
+  coverage_type:
+    - Example Building Coverage
+  applies_to_risk:
+    - Example Harbor Warehouse
