@@ -1,5 +1,5 @@
 {
-  "total_remembered": 23,
+  "total_remembered": 35,
   "total_recalled": 3,
   "total_forgotten": 0,
   "consolidation_runs": [
@@ -12,6 +12,24 @@
     {
       "timestamp": "2026-11-14T21:47:57.819Z",
       "decayed": 9,
+      "merged": 0,
+      "removed": 0
+    },
+    {
+      "timestamp": "2026-11-15T00:38:08.231Z",
+      "decayed": 40,
+      "merged": 6,
+      "removed": 0
+    },
+    {
+      "timestamp": "2026-11-15T00:39:09.042Z",
+      "decayed": 53,
+      "merged": 0,
+      "removed": 0
+    },
+    {
+      "timestamp": "2026-11-15T00:56:46.557Z",
+      "decayed": 53,
       "merged": 0,
       "removed": 0
     }

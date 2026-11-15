@@ -3,7 +3,7 @@ id: mem_d3da12f7a729
 created: "2026-11-14T22:00:13.885Z"
 last_retrieved: "2026-11-14T22:00:13.885Z"
 retrieval_count: 0
-strength: 1
+strength: 0.9998
 half_life_days: 547.5
 layer: episodic
 tags: [req, queue, "path:grege", "path:semmodel"]

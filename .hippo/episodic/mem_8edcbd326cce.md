@@ -1,10 +1,10 @@
 ---
 id: mem_8edcbd326cce
 created: "2026-11-14T21:15:07.368Z"
-last_retrieved: "2026-11-14T21:15:07.368Z"
-retrieval_count: 0
+last_retrieved: "2026-11-15T00:56:46.557Z"
+retrieval_count: 1
 strength: 1
-half_life_days: 730
+half_life_days: 221
 layer: episodic
 tags: [error, auto-captured]
 emotional_valence: negative

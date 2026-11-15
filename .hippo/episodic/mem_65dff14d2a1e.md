@@ -3,7 +3,7 @@ id: mem_65dff14d2a1e
 created: "2026-11-14T23:22:28.556Z"
 last_retrieved: "2026-11-14T23:22:28.556Z"
 retrieval_count: 0
-strength: 1
+strength: 0.9999
 half_life_days: 365
 layer: episodic
 tags: [req, queue, "path:grege", "path:semmodel"]

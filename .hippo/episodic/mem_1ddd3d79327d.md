@@ -1,10 +1,10 @@
 ---
 id: mem_1ddd3d79327d
 created: "2026-11-14T22:13:15.412Z"
-last_retrieved: "2026-11-14T22:13:15.412Z"
-retrieval_count: 0
+last_retrieved: "2026-11-15T00:38:08.231Z"
+retrieval_count: 1
 strength: 1
-half_life_days: 365
+half_life_days: 367
 layer: episodic
 tags: [req, queue, "path:grege", "path:semmodel"]
 emotional_valence: neutral

@@ -3,7 +3,7 @@ id: mem_beaf420dfb2f
 created: "2026-11-14T22:24:33.203Z"
 last_retrieved: "2026-11-14T22:24:33.203Z"
 retrieval_count: 0
-strength: 1
+strength: 0.9998
 half_life_days: 365
 layer: episodic
 tags: [req, queue, "path:grege", "path:semmodel"]

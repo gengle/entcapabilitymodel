@@ -3,7 +3,7 @@ id: mem_055dc4cd4f2e
 created: "2026-11-14T21:47:58.224Z"
 last_retrieved: "2026-11-14T21:47:58.224Z"
 retrieval_count: 0
-strength: 1
+strength: 0.9998
 half_life_days: 365
 layer: episodic
 tags: [captured-note, captured, follow-up]
