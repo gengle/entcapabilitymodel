@@ -1,0 +1,13 @@
+kind: Entity
+type: ClaimPayment
+name: Example Warehouse Claim Payment
+id: 3de3d7b2-be40-468a-bc10-110eab9e5412
+props:
+  identifier: PAYMENT-001
+  amount: "5000 USD"
+  description: Illustrative payment to the example claimant.
+relations:
+  pays_claim:
+    - Example Warehouse Claim
+  paid_to:
+    - Example Claimant

@@ -1,0 +1,7 @@
+kind: Entity
+type: Organization
+name: Example Harbor Manufacturing
+id: 0faf70e9-469d-4756-b958-d8b3b328c597
+props:
+  identifier: ORG-CUSTOMER-001
+  description: Fictional commercial policyholder and insured organization.

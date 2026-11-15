@@ -1,0 +1,12 @@
+kind: Entity
+type: BillingAccount
+name: Example Property Billing Account
+id: 71789377-d385-4ea4-9713-b15b3562c4c4
+props:
+  identifier: ACCOUNT-001
+  description: Fictional billing account for the policyholder.
+relations:
+  bills_policy:
+    - Example Commercial Property Policy
+  billed_to:
+    - Example Harbor Manufacturing

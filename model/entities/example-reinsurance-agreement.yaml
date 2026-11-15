@@ -1,0 +1,10 @@
+kind: Entity
+type: ReinsuranceAgreement
+name: Example Property Reinsurance Agreement
+id: 0f1fca53-a35c-4c4e-ae3a-a04295bdec8c
+props:
+  identifier: AGREEMENT-001
+  description: Fictional reinsurance agreement for commercial property risk.
+relations:
+  reinsurer:
+    - Example Reinsurer

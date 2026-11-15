@@ -1,0 +1,14 @@
+kind: Entity
+type: Team
+name: Example Insurance Operations
+id: b453b13d-60c8-4019-94cc-ed879b060fd9
+relations:
+  exposes:
+    - target: Insurance Underwriting/Submission Management/Submission Intake
+      coverage: partial
+    - target: Insurance Policy Administration/Policy Servicing/Policy Change Management
+      coverage: partial
+    - target: Insurance Claims/Claim Intake/First Notice of Loss
+      coverage: partial
+    - target: Insurance Billing and Collections/Insurance Billing/Premium Invoicing
+      coverage: partial

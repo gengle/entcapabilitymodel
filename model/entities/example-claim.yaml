@@ -1,0 +1,17 @@
+kind: Entity
+type: Claim
+name: Example Warehouse Claim
+id: c0467312-0fe9-45b5-b27c-7629d0f1acee
+props:
+  identifier: CLAIM-001
+  reported_date: "2026-04-11"
+  description: Fictional claim associated with the warehouse loss.
+relations:
+  claim_under_policy:
+    - Example Commercial Property Policy
+  claim_against_coverage:
+    - Example Building Coverage Terms
+  arises_from:
+    - Example Warehouse Loss
+  claimant:
+    - Example Claimant

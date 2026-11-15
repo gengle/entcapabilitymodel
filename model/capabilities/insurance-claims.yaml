@@ -1,0 +1,50 @@
+kind: Capability
+name: Insurance Claims
+id: 1e29a936-3257-43e9-b7da-5831e77e9532
+props:
+  owner: Insurance Architecture
+  criticality: high
+children:
+  - name: Claim Intake
+    id: 4274d326-6828-4584-a551-4ff23361db4f
+    children:
+      - name: First Notice of Loss
+        id: 9360ef38-60d6-4321-9f11-32ee08b5f31c
+        children:
+          - name: Loss Event Capture
+            id: 7d6dfad8-85d3-4e44-80d2-9659784529da
+          - name: Claim Registration
+            id: 2b925d50-e836-4034-9ab4-af32f110033d
+      - name: Claim Coverage Verification
+        id: 455c925e-7c2c-43d1-a785-d274c6bd708e
+      - name: Claim Assignment
+        id: 1f88c561-fb52-4281-a9b2-50347f4469c2
+  - name: Claim Investigation
+    id: 291f0c4c-6e29-4b2d-ac83-43b3b27e1af1
+    children:
+      - name: Claim Evidence Management
+        id: f22bbdaf-b4b4-4ffd-a84d-3a9aeaa56789
+      - name: Claim Liability Assessment
+        id: 09e88897-a6c7-40ca-9587-c02de6bb17db
+      - name: Claim Fraud Assessment
+        id: 7d6ddb08-0e66-4c21-bbaf-cdd9f57ef290
+      - name: Claim Vendor Coordination
+        id: 8bee1787-5238-4d88-9973-ac62169e4870
+  - name: Claim Resolution
+    id: 2ab50471-7351-4485-9b30-778a904d73c4
+    children:
+      - name: Claim Reserving
+        id: 1dca792f-809c-4146-99a5-05ec8dc49127
+      - name: Claim Settlement
+        id: b946679b-c77c-4b93-a6f0-bbdf0c1c1b6d
+      - name: Claim Payment Processing
+        id: a726908c-10b6-497e-8bb1-9b694a3e2ce1
+      - name: Claim Recovery
+        id: b61ed58a-2b61-42de-a975-ef275a87c423
+        children:
+          - name: Subrogation Management
+            id: 00f7d92f-1f84-454c-a9e5-fc32113a8340
+          - name: Salvage Management
+            id: e0ccaf0f-964e-4480-b5b6-245fc4ca6a06
+      - name: Claim Closure
+        id: bb4a4ff7-2b7b-4a2f-b77c-e8fec3ec40c3

@@ -1,0 +1,40 @@
+kind: Capability
+name: Insurance Product Management
+id: 89ff5fac-d080-447f-a7cf-e95ec4e21b60
+props:
+  owner: Insurance Architecture
+children:
+  - name: Product Strategy
+    id: 7f1afa71-56f5-41c4-bb9f-d07bbf9c797a
+    children:
+      - name: Insurance Market Research
+        id: acb3f9d4-ba00-455c-9215-bd77d55f2ad1
+      - name: Product Portfolio Management
+        id: f0dbc2a1-df1b-4462-bab2-69b687879b88
+      - name: Product Performance Management
+        id: d24e6a70-077c-4891-9f47-acc8405d8683
+  - name: Product Design
+    id: 31c99b8f-936e-4f34-bef1-45603d5d10ce
+    children:
+      - name: Coverage Design
+        id: d66a0326-4751-44dc-9827-82eb8ba67b6f
+        children:
+          - name: Coverage Terms Design
+            id: c37b6512-2ea9-4557-bace-4d3d842688c2
+          - name: Exclusion Design
+            id: cb3f5c92-e1f5-42a4-994e-c0e933ee5160
+          - name: Limits and Deductibles Design
+            id: 85af6105-0426-44a6-ac7d-86de10ff8674
+      - name: Insurance Eligibility Design
+        id: efe2ed9c-5a57-468a-8efa-681cd0888a65
+      - name: Insurance Form Design
+        id: 85177c58-2d13-4cfc-9160-ebbad04b85fb
+  - name: Product Deployment
+    id: ff3241b4-3fca-4f3f-944a-82ddf2cc1477
+    children:
+      - name: Product Filing Management
+        id: f09b6e87-eb58-48fd-8a64-b109cd275c95
+      - name: Product Configuration
+        id: 7754b563-2982-403e-b586-41a92230bfa8
+      - name: Product Launch Management
+        id: d338db50-3a7e-4429-923b-6d292141b9c4

@@ -1,0 +1,25 @@
+kind: Entity
+type: Policy
+name: Example Commercial Property Policy
+id: b80071c3-ded7-4619-bd66-bafc6d3870d1
+props:
+  identifier: POLICY-001
+  effective_date: "2026-02-01"
+  expiration_date: "2027-02-01"
+  description: Fictional commercial property policy issued from the example quote.
+relations:
+  issued_from:
+    - Example Property Quote
+  issued_by:
+    - Example Mutual Insurer
+  policyholder:
+    - Example Harbor Manufacturing
+  insured_party:
+    - Example Harbor Manufacturing
+  produced_by:
+    - Example Coastal Brokerage
+  includes_coverage:
+    - Example Building Coverage
+    - Example Business Income Coverage
+  covers_risk:
+    - Example Harbor Warehouse

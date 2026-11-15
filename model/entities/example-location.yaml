@@ -1,0 +1,7 @@
+kind: Entity
+type: LocationRisk
+name: Example Harbor Warehouse
+id: 618bc235-3c14-44e2-9c3f-205ee567a97a
+props:
+  identifier: LOCATION-001
+  description: Fictional insured warehouse exposure.

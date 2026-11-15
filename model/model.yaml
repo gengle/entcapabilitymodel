@@ -1,7 +1,7 @@
 # Entry point. Documents (files with a `kind`) found through these includes make up the model.
 kind: Model
 name: Enterprise capability model
-version: 2.1.0
+version: 2.3.0
 include:
   - schema/*.yaml
   - capabilities/*.yaml

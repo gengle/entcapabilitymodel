@@ -1,0 +1,7 @@
+kind: Entity
+type: Coverage
+name: Example Business Income Coverage
+id: 37eda8f0-d67e-43f4-abe2-c405b0853d18
+props:
+  identifier: COVERAGE-002
+  description: Illustrative business income protection, subject to policy terms.

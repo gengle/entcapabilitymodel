@@ -1,0 +1,121 @@
+kind: Schema
+entity_types:
+  InsuranceConcept:
+    description: An illustrative insurance business object, not a system of record.
+    props:
+      identifier:
+        type: string
+        description: Example business identifier; it is not the model UUID.
+      description:
+        type: string
+        description: Business meaning or scope of this example.
+  Party:
+    extends: InsuranceConcept
+    description: A person or organization participating in an insurance transaction.
+  Person:
+    extends: Party
+    description: An individual party.
+  Organization:
+    extends: Party
+    description: A legal or other organizational party.
+  InsuranceProduct:
+    extends: InsuranceConcept
+    description: An offering that defines insurance available to customers.
+    props:
+      line_of_business:
+        type: string
+        description: Business line served by the offering.
+  Coverage:
+    extends: InsuranceConcept
+    description: A protection offered by a product or included in a policy.
+  Submission:
+    extends: InsuranceConcept
+    description: Information submitted for underwriting consideration.
+    props:
+      received_date:
+        type: string
+        description: Illustrative ISO 8601 calendar date.
+  Quote:
+    extends: InsuranceConcept
+    description: A proposed price and terms resulting from a submission.
+    props:
+      quoted_premium:
+        type: string
+        description: Illustrative amount and currency, not a validated monetary value.
+  Policy:
+    extends: InsuranceConcept
+    description: An insurance contract for a specified term.
+    props:
+      effective_date:
+        type: string
+        description: Illustrative ISO 8601 start date.
+      expiration_date:
+        type: string
+        description: Illustrative ISO 8601 end date.
+  PolicyCoverage:
+    extends: InsuranceConcept
+    description: Policy-specific terms for a coverage and, optionally, an insured risk.
+    props:
+      limit:
+        type: string
+        description: Illustrative amount and currency, not a validated monetary value.
+      deductible:
+        type: string
+        description: Illustrative amount and currency, not a validated monetary value.
+  PolicyChange:
+    extends: InsuranceConcept
+    description: A change to a policy, such as an endorsement.
+    props:
+      effective_date:
+        type: string
+        description: Illustrative ISO 8601 effective date.
+  InsuredRisk:
+    extends: InsuranceConcept
+    description: An exposure or subject of insurance assessed under a policy.
+  LocationRisk:
+    extends: InsuredRisk
+    description: An insured location and its associated exposure.
+  Claim:
+    extends: InsuranceConcept
+    description: A demand for benefits or compensation under a policy.
+    props:
+      reported_date:
+        type: string
+        description: Illustrative ISO 8601 notification date.
+  LossEvent:
+    extends: InsuranceConcept
+    description: An occurrence that may give rise to one or more claims.
+    props:
+      loss_date:
+        type: string
+        description: Illustrative ISO 8601 occurrence date.
+  Reserve:
+    extends: InsuranceConcept
+    description: An estimate of a claim's outstanding financial obligation.
+    props:
+      amount:
+        type: string
+        description: Illustrative amount and currency, not a validated monetary value.
+  ClaimPayment:
+    extends: InsuranceConcept
+    description: A payment made in connection with a claim.
+    props:
+      amount:
+        type: string
+        description: Illustrative amount and currency, not a validated monetary value.
+  BillingAccount:
+    extends: InsuranceConcept
+    description: An account used to organize insurance billing.
+  Invoice:
+    extends: InsuranceConcept
+    description: A request for payment associated with a billing account.
+    props:
+      amount:
+        type: string
+        description: Illustrative amount and currency, not a validated monetary value.
+  ReinsuranceAgreement:
+    extends: InsuranceConcept
+    description: An agreement transferring specified insurance risk to a reinsurer.
+  ReinsuranceCession:
+    extends: InsuranceConcept
+    description: A portion of policy risk ceded under a reinsurance agreement.

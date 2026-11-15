@@ -1,0 +1,12 @@
+kind: Entity
+type: ReinsuranceCession
+name: Example Property Cession
+id: e2001e9d-628f-4d36-86b6-12c75f7ecf92
+props:
+  identifier: CESSION-001
+  description: Fictional cession of a share of the example policy risk.
+relations:
+  ceded_under:
+    - Example Property Reinsurance Agreement
+  cedes_policy:
+    - Example Commercial Property Policy

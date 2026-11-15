@@ -1,0 +1,11 @@
+kind: Entity
+type: Quote
+name: Example Property Quote
+id: 17894384-b1cf-48ed-867e-5c944efb1831
+props:
+  identifier: QUOTE-001
+  quoted_premium: "12000 USD"
+  description: Fictional premium proposal for the example submission.
+relations:
+  quotes_submission:
+    - Example Property Submission

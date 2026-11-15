@@ -1,0 +1,38 @@
+kind: Capability
+name: Insurance Distribution
+id: 5d393009-c7b1-4a0f-a0c0-b646648f08c9
+props:
+  owner: Insurance Architecture
+children:
+  - name: Distribution Strategy
+    id: b8375fd8-4c58-49e9-9534-312ce06f1480
+    children:
+      - name: Distribution Channel Management
+        id: 0705add2-a591-42b3-8474-305c1b0400b4
+      - name: Insurance Campaign Management
+        id: c0abc913-b3a8-449f-a8d5-46b41293df3d
+      - name: Insurance Lead Management
+        id: 9b152421-f9ef-462f-90cb-a52ff3c1408c
+  - name: Producer Management
+    id: 2719d719-1f72-4733-9a3b-2064bc3eca4a
+    children:
+      - name: Producer Onboarding
+        id: bfa06057-889f-442f-ab1b-2782654bcdb7
+        children:
+          - name: Producer Appointment
+            id: 6c609277-2a46-4612-bf8c-fe7ae26a3f95
+          - name: Producer Licensing Verification
+            id: 1350e483-831c-4de0-8a05-29c35a8d56b3
+      - name: Producer Relationship Management
+        id: 792263cc-2be6-49b6-8a93-fbbf2231d868
+      - name: Producer Compensation Management
+        id: 8160ae7c-06a3-4435-9123-ea1161670920
+  - name: Insurance Sales
+    id: 70864b7c-bc4e-494a-92ad-08ad668a64a2
+    children:
+      - name: Insurance Needs Assessment
+        id: 27ce9995-94b0-4ae1-b1e5-9e1a9df7fd21
+      - name: Insurance Proposal Management
+        id: 07b76071-ac9f-42ae-bbbe-368d9f194b96
+      - name: Insurance Sales Conversion
+        id: 9cc2ac24-9419-45f2-9682-35266d52831d

@@ -7,6 +7,21 @@ Bump rules: **major** when a change can break existing model files or consumers 
 or renamed type, property or relation type; a stricter rule), **minor** for additions (new types, properties,
 relation types, entities, capabilities, features), **patch** for fixes and changes that don't alter meaning.
 
+## [2.3.0] - 2026-11-14
+
+### Added
+- A print-friendly capability map in the viewer, with domain and level selection, optional coverage indicators, and
+  print/PDF output. The map follows the live preview and marks the presence of unsaved edits.
+
+## [2.2.0] - 2026-11-14
+
+### Added
+- An illustrative insurance enterprise capability map covering product, distribution, underwriting, policy, billing,
+  claims, reinsurance and enterprise management alongside the existing enterprise domains.
+- Typed insurance business concepts and relationships, with a fictional connected example from submission and quote
+  through policy, billing, claim and reinsurance. Example providers illustrate capability mapping.
+- Documentation of the example's scope and validation limitations; it does not claim ACORD conformance.
+
 ## [2.1.0] - 2026-11-14
 
 ### Added

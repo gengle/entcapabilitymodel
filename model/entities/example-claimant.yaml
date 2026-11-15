@@ -1,0 +1,7 @@
+kind: Entity
+type: Person
+name: Example Claimant
+id: ddd36f81-ca49-4216-bdfc-ada846bc4886
+props:
+  identifier: PERSON-CLAIMANT-001
+  description: Fictional claimant receiving an illustrative claim payment.

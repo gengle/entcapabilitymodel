@@ -27,6 +27,29 @@ Every capability and entity carries a universal `id` (a UUID) that stays the sam
 reports a missing id as a warning and a malformed or duplicate one as an error. The model's `version` (MAJOR.MINOR.PATCH)
 is stamped into the SQL, CSV and OpenAPI output.
 
+## Insurance enterprise example
+
+The model includes an illustrative insurance enterprise capability map spanning product, distribution, underwriting,
+policy administration, billing, claims, reinsurance, and enterprise management. Existing finance, human resources and
+technology capabilities remain alongside it. `Insurance Architecture` is a placeholder owner, not a real organization.
+Most new capabilities intentionally have no provider; coverage gaps show where an organization can map its own teams
+and systems. The example operations team and policy platform demonstrate provider and dependency links only.
+
+The insurance schema in `model/schema/insurance-entity-types.yaml` and `model/schema/insurance-relations.yaml` models
+parties, products, coverages, submissions, quotes, policies, risks, claims, billing and reinsurance as typed entities
+and relationships. Files named `model/entities/example-*.yaml` contain fictional records. For example:
+
+    python sem.py show "Example Commercial Property Policy"
+    python sem.py neighbors "Example Warehouse Claim"
+    python sem.py path "Example Warehouse Claim" "Example Commercial Property Product"
+
+The vocabulary is insurance-domain inspired, **not an implementation of or a conformance claim to ACORD**. Coverage
+concepts are shared by products and policies; `PolicyCoverage` illustrates policy-specific limits, deductibles and
+insured risks. The model validates declared types, relationship endpoints and basic properties, but not required
+relationship cardinalities, cross-link consistency, insurance contract rules, dates, currency amounts, jurisdictional
+requirements or ACORD messages.
+It is a starting point for tailoring, not a complete carrier operating model or a production transaction schema.
+
 ## CLI
 
     python sem.py tree | schema | validate [--strict] | show X | neighbors X | closure X rel | path A B | who X | gaps | coverage | impact E
@@ -46,6 +69,10 @@ files or in the viewer.
 
 Browse files, the capability tree and entities; edit YAML with a live preview of the rendered model and its validation; saves
 that would add validation errors are rejected unless forced; external file changes reload automatically.
+
+**Capability map** in the top navigation presents a print-friendly enterprise map. Choose a domain and depth, optionally
+show coverage, then use **Print / Save PDF**. It follows the live preview, including unsaved edits; verify the preview
+before printing. Browser print settings control paper size, orientation and PDF output.
 
 **Edit form** (on any entity or capability) edits it without touching YAML: name, type, properties, relations (targets
 come from drop-downs limited to what the relation type allows, attributes get their own controls), and child

@@ -1,0 +1,7 @@
+kind: Entity
+type: Organization
+name: Example Reinsurer
+id: 2ca46123-69dc-4a98-8fa3-faa5076d7efa
+props:
+  identifier: ORG-REINSURER-001
+  description: Fictional reinsurer accepting a share of the example risk.

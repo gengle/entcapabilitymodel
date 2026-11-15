@@ -1,0 +1,34 @@
+kind: Capability
+name: Insurance Billing and Collections
+id: e2a38399-8f93-4d2a-8f25-ff061d1dcba6
+props:
+  owner: Insurance Architecture
+  criticality: high
+children:
+  - name: Insurance Billing
+    id: efe0544d-e81f-400b-9517-427a6c2abc83
+    children:
+      - name: Billing Account Management
+        id: b746740b-e88e-4c20-a41d-b573a3c7fe05
+      - name: Premium Invoicing
+        id: a66e06ea-824a-4b83-b8fd-82ae31f971a6
+      - name: Installment Plan Management
+        id: 0f2fc11f-b66b-44ef-b0da-00ae6564d93b
+  - name: Premium Collection
+    id: 75a04163-8608-4258-81ae-9ea75c559e23
+    children:
+      - name: Premium Payment Processing
+        id: 9c697ab6-a69e-4889-afb8-d11f558787eb
+      - name: Payment Allocation
+        id: a652275f-1a00-47d2-834f-c908c886af0a
+      - name: Delinquency Management
+        id: ebdfdb48-d407-4270-b273-1a2395025eae
+  - name: Insurance Receivables
+    id: 31bfa6d5-e7cb-418b-a6fc-06cd03058f47
+    children:
+      - name: Premium Reconciliation
+        id: 2e78aef0-9611-4045-8709-ad599bd5d1ae
+      - name: Insurance Refund Management
+        id: 4638596b-7b0e-4d08-b3fe-40d11926ccf2
+      - name: Receivables Reporting
+        id: 3ce6e2d2-1404-4cda-b0d4-616037460f78

@@ -1,0 +1,11 @@
+kind: Entity
+type: PolicyChange
+name: Example Property Endorsement
+id: 1cdf151f-7d23-4d2b-bc4a-4f13536664cd
+props:
+  identifier: CHANGE-001
+  effective_date: "2026-03-01"
+  description: Fictional endorsement updating the insured building details.
+relations:
+  changes_policy:
+    - Example Commercial Property Policy

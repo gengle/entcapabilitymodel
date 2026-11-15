@@ -1,0 +1,46 @@
+kind: Capability
+name: Insurance Enterprise Management
+id: a7858d72-ff18-4512-9dce-36b1e1c2a5e2
+props:
+  owner: Insurance Architecture
+children:
+  - name: Insurance Risk and Compliance
+    id: 4f7b87bc-8ae7-4bc2-9c41-63f6fd353f26
+    children:
+      - name: Insurance Regulatory Compliance
+        id: 14748e38-2c73-41be-b7ad-4f4527bca594
+      - name: Insurance Enterprise Risk Management
+        id: 390a150a-f8ca-411c-909a-46388d9879e5
+      - name: Insurance Financial Crime Prevention
+        id: 7c81f925-1b7f-484f-a252-e607229063df
+      - name: Insurance Privacy Management
+        id: 0277e13f-cde1-49e9-9af4-211c1683c7a5
+  - name: Insurance Finance and Actuarial
+    id: 26e8dd42-7efc-4252-8e12-c1121860a412
+    children:
+      - name: Insurance Financial Reporting
+        id: c3a93fa7-b5ad-40d8-8d08-5ef2c10c2f3b
+      - name: Insurance Capital Management
+        id: e029136b-1b44-490d-ac8a-070920c450b9
+      - name: Actuarial Reserving
+        id: 55b262ef-f1c8-4fa3-a0e3-ca2b1f04ec82
+      - name: Actuarial Pricing Analysis
+        id: 254bf7d5-5e75-4714-b8b0-614343558935
+  - name: Insurance Customer Management
+    id: 695514d5-ce93-48ff-97a0-ad5b2371d1fd
+    children:
+      - name: Insurance Party Management
+        id: 8ff7bde8-aab4-4908-b332-b22a2b2516b1
+      - name: Insurance Customer Service
+        id: 9e9ec07b-80c5-4ae2-b51b-209f05e6306e
+      - name: Insurance Complaint Management
+        id: 75bc8279-5a7f-4fb0-a919-c2a3ee5bc4bd
+  - name: Insurance Information Management
+    id: b13c286a-e666-4d07-b5d7-0750dd806788
+    children:
+      - name: Insurance Data Governance
+        id: 548689b1-3a22-4a3a-ab08-ff4f3c1fcc6b
+      - name: Insurance Analytics
+        id: 6152a42e-f939-4e0f-a4ff-aaa45afd1587
+      - name: Insurance Records Management
+        id: ca2b38b2-c343-42a2-b876-85b4954a0fd1
